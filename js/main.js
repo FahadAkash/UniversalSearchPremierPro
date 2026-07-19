@@ -1338,7 +1338,46 @@ document.getElementById("batch-actions").addEventListener("click", async (e) => 
   if (!action) return;
   const currentMatches = lastSnapshot.filter(c => matchIds.has(c.id));
 
-  if (action === "select-all") {
+  if (action === "batch-edit") {
+    let defaultProp = "";
+    activeQueries.forEach(q => {
+      if (q.includes(":")) defaultProp = q.split(":")[0];
+    });
+
+    const propRaw = prompt("Enter the property name you want to batch edit (e.g. 'Uniform Scale' or 'Opacity'):", defaultProp);
+    if (!propRaw) return;
+
+    const valRaw = prompt(`Enter the new value for "${propRaw}":`);
+    if (valRaw === null) return;
+
+    const squashed = propRaw.toLowerCase().replace(/\s+/g, "");
+    
+    // Convert boolean-like strings
+    let isString = true;
+    let finalVal = valRaw.trim();
+    if (finalVal.toLowerCase() === "true" || finalVal.toLowerCase() === "on") {
+      finalVal = 1;
+      isString = false;
+    } else if (finalVal.toLowerCase() === "false" || finalVal.toLowerCase() === "off") {
+      finalVal = 0;
+      isString = false;
+    } else if (!isNaN(parseFloat(finalVal))) {
+      finalVal = parseFloat(finalVal);
+      isString = false;
+    }
+
+    const idsToEdit = Array.from(selectedIds.size > 0 ? selectedIds : new Set(currentMatches.map(c => c.id)));
+    if (idsToEdit.length === 0) return;
+
+    const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), squashed, finalVal, isString);
+    if (res && res.success) {
+      // Force an immediate refresh
+      pollProject();
+    } else {
+      alert("Error batch editing properties: " + (res ? res.error : "Unknown error"));
+    }
+    return;
+  } else if (action === "select-all") {
     selectedIds = new Set(currentMatches.map(c => c.id));
     await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
   } else if (action === "reveal-first") {

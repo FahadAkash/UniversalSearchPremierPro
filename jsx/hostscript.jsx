@@ -665,3 +665,51 @@ function ffs_batchAction(idsJson, actionType, value) {
         return JSON.stringify({ success: false, error: e.toString() });
     }
 }
+
+// Batch edit an arbitrary effect property across multiple clips
+function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isString) {
+    var count = 0;
+    try {
+        var clipIds = JSON.parse(clipIdsJson);
+        var targetVal = isString ? newValue : parseFloat(newValue);
+        var parsedIds = [];
+        for (var i = 0; i < clipIds.length; i++) {
+            var parts = clipIds[i].split("_");
+            parsedIds.push({
+                s: parseInt(parts[0].replace("seq", ""), 10),
+                type: parts[1].charAt(0),
+                t: parseInt(parts[1].substring(1), 10),
+                c: parseInt(parts[2].replace("c", ""), 10)
+            });
+        }
+
+        var seqs = app.project.sequences;
+        for (var i = 0; i < parsedIds.length; i++) {
+            var p = parsedIds[i];
+            if (p.s >= seqs.numSequences) continue;
+            var seq = seqs[p.s];
+            var trackList = (p.type === "V") ? seq.videoTracks : seq.audioTracks;
+            if (p.t >= trackList.numTracks) continue;
+            var track = trackList[p.t];
+            if (p.c >= track.clips.numItems) continue;
+            var clip = track.clips[p.c];
+
+            for (var k = 0; k < clip.components.numItems; k++) {
+                var comp = clip.components[k];
+                for (var pr = 0; pr < comp.properties.numItems; pr++) {
+                    var prop = comp.properties[pr];
+                    if (prop.displayName) {
+                        var key = prop.displayName.toLowerCase().replace(/\s+/g, "");
+                        if (key === squashedPropertyName) {
+                            prop.setValue(targetVal, 1);
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+        return JSON.stringify({ success: true, count: count });
+    } catch(e) {
+        return JSON.stringify({ success: false, error: e.toString() });
+    }
+}
