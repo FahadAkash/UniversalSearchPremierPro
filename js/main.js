@@ -269,13 +269,17 @@ function runSearch(raw, opts = {}) {
   });
 }
 
-async function selectClip(clip, additive) {
+function selectClip(clip, additive) {
   if (!additive) selectedIds = new Set();
   selectedIds.add(clip.id);
-  await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+  
+  // Update local UI immediately so it feels instant
   updateInspector(clip);
   runSearch(lastQuery, { rerenderOnly: true });
   window.ffsRerenderTimeline();
+
+  // Fire off ExtendScript selection in background without blocking the UI
+  evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
 }
 
 // Update the dynamic inspector panel
