@@ -404,6 +404,22 @@ function updateInspector(clip) {
     });
     usageSec.innerHTML = usageHtml;
   }
+
+  // Update Metadata section
+  const metaSec = document.getElementById("insp-metadata");
+  if (metaSec) {
+    metaSec.innerHTML = `
+      <div class="insp-section-title">Metadata</div>
+      <div class="prop-row"><span class="k">Media Path</span><span class="v" style="word-break: break-all; text-align:right;">${escapeHtmlMain(clip.mediaPath || '—')}</span></div>
+      <div class="prop-row"><span class="k">Camera</span><span class="v">${escapeHtmlMain(clip.camera || '—')}</span></div>
+      <div class="prop-row"><span class="k">Resolution</span><span class="v">${escapeHtmlMain(clip.resolution || '—')}</span></div>
+      <div class="prop-row"><span class="k">Frame Rate</span><span class="v">${clip.fps ? clip.fps + ' fps' : '—'}</span></div>
+      <div class="prop-row"><span class="k">Codec</span><span class="v">${escapeHtmlMain(clip.codec || '—')}</span></div>
+      <div class="prop-row"><span class="k">Color Label</span><span class="v">${escapeHtmlMain(clip.colorLabel || '—')}</span></div>
+      <div class="prop-row"><span class="k">Offline</span><span class="v">${clip.offline ? 'Yes' : 'No'}</span></div>
+      <div class="prop-row"><span class="k">Proxy</span><span class="v">${clip.proxy ? 'Attached' : 'None'}</span></div>
+    `;
+  }
 }
 
 // Project Analytics — update sidebar badges with real counts
@@ -1172,3 +1188,26 @@ renderSavedSearches();
 // Start polling
 pollProject();
 setInterval(pollProject, POLL_MS);
+
+// Inspector Tab Switching
+document.querySelectorAll(".insp-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".insp-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    
+    const text = tab.textContent;
+    const motion = document.getElementById("insp-motion");
+    const audio = document.getElementById("insp-audio");
+    const effects = document.getElementById("insp-effects");
+    const usage = document.getElementById("insp-usage");
+    const metadata = document.getElementById("insp-metadata");
+    
+    if (motion) motion.classList.toggle("hidden", text !== "Properties");
+    if (audio) audio.classList.toggle("hidden", text !== "Properties");
+    if (effects) effects.classList.toggle("hidden", text !== "Properties");
+    
+    if (usage) usage.classList.toggle("hidden", text !== "Usage");
+    if (metadata) metadata.classList.toggle("hidden", text !== "Metadata");
+  });
+});
+
