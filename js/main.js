@@ -106,10 +106,10 @@ document.addEventListener("mousemove", () => { lastInteractionTime = Date.now();
 document.addEventListener("keydown", () => { lastInteractionTime = Date.now(); });
 document.addEventListener("click", () => { lastInteractionTime = Date.now(); });
 
-async function pollProject() {
+async function pollProject(force = false) {
   if (isPolling) return;
   // If the user has interacted within the last 1500ms, skip polling
-  if (Date.now() - lastInteractionTime < 1500) return;
+  if (!force && Date.now() - lastInteractionTime < 1500) return;
   
   isPolling = true;
   try {
@@ -997,6 +997,11 @@ function updateSuggestions() {
   }));
 
   allSuggestions = [...coreOptions, ...paramOptions, ...effectOptions];
+  
+  const qInput = document.getElementById("query");
+  if (document.activeElement === qInput) {
+    renderCustomSuggestions(qInput.value);
+  }
 }
 
 function renderCustomSuggestions(filterText = "") {
@@ -1049,6 +1054,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderCustomSuggestions(e.target.value);
     });
     qInput.addEventListener("focus", (e) => {
+      pollProject(true); // Force an instant poll to get newly added effects
       renderCustomSuggestions(e.target.value);
     });
     qInput.addEventListener("keydown", (e) => {
