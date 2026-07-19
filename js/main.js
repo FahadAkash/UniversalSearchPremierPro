@@ -12,7 +12,7 @@ let selectedIds = new Set();
 let activeSequenceName = null;
 let playheadSeconds = 0;
 let aiSearchEnabled = false;
-let autoSelectEnabled = true;
+let autoSelectEnabled = false;
 let searchDebounceTimer = null;
 let lastLayerData = null;
 let knownEffects = [];
@@ -1638,8 +1638,21 @@ function openBatchEditModal(clips) {
       if (res && res.success) {
         applyBtn.innerHTML = "✓ Applied!";
         applyBtn.style.background = "var(--green)";
-        pollProject(true);
-        setTimeout(closeModal, 600);
+        
+        // Refresh and update prop values in modal (don't close immediately)
+        await pollProject(true);
+        // Wait a tick for pollProject to update lastSnapshot
+        await new Promise(r => setTimeout(r, 300));
+        
+        // Refresh the clips data from latest snapshot
+        clips = lastSnapshot.filter(c => clips.some(m => m.id === c.id));
+        
+        // Rerender current effect's props with fresh values
+        renderProps();
+        
+        applyBtn.innerHTML = "Apply Changes";
+        applyBtn.disabled = false;
+        applyBtn.style.background = "";
       } else {
         applyBtn.innerHTML = "Apply Changes";
         applyBtn.disabled = false;
