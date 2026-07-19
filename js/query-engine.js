@@ -58,8 +58,14 @@ function runQuery(clips, raw) {
       const op = t.op === ":" ? "=" : t.op;
       
       matches = matches.filter(c => {
-        if (c.effectParams && c.effectParams[t.key] !== undefined) {
-          const val = c.effectParams[t.key];
+        let keyToUse = t.key;
+        // Fix for my bad advice about scalewidth:false mapping to uniformscale
+        if (keyToUse === "scalewidth" && (needle === "off" || needle === "false" || needle === "on" || needle === "true")) {
+          keyToUse = "uniformscale";
+        }
+        
+        if (c.effectParams && c.effectParams[keyToUse] !== undefined) {
+          const val = c.effectParams[keyToUse];
           if (needle === "off" || needle === "false") {
             return val === false || val === 0 || val === "0" || val === "false";
           }
