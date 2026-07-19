@@ -99,67 +99,74 @@ function translateAILanguage(input) {
 }
 
 async function pollProject() {
-  const t0 = performance.now();
-  const [snapshotJson, stateJson] = await Promise.all([
-    evalHost("ffs_getProjectSnapshot"),
-    evalHost("ffs_getActiveState")
-  ]);
-  const searchTime = (performance.now() - t0).toFixed(0);
+  try {
+    const t0 = performance.now();
+    const [snapshotJson, stateJson] = await Promise.all([
+      evalHost("ffs_getProjectSnapshot"),
+      evalHost("ffs_getActiveState")
+    ]);
+    const searchTime = (performance.now() - t0).toFixed(0);
 
-  // Update search timing
-  const speedEl = document.querySelector(".stat-pill.speed b");
-  if (speedEl) speedEl.textContent = searchTime + "ms";
+    // Update search timing
+    const speedEl = document.querySelector(".stat-pill.speed b");
+    if (speedEl) speedEl.textContent = searchTime + "ms";
 
-  const indicator = document.getElementById("live-indicator");
-  const state = stateJson;
-  if (state && state.connected) {
-    indicator.innerHTML = '<span class="dot"></span> Live Connected';
-    indicator.style.opacity = "1";
-    activeSequenceName = state.sequence;
-    playheadSeconds = state.playhead || 0;
+    const indicator = document.getElementById("live-indicator");
+    const state = stateJson;
+    if (state && state.connected) {
+      indicator.innerHTML = '<span class="dot"></span> Live Connected';
+      indicator.style.opacity = "1";
+      activeSequenceName = state.sequence;
+      playheadSeconds = state.playhead || 0;
 
-    // Update project name dynamically
-    if (state.projectName && state.projectName !== projectName) {
-      projectName = state.projectName;
-      const projChip = document.querySelector(".project-chip b");
-      if (projChip) projChip.textContent = projectName;
+      // Update project name dynamically
+      if (state.projectName && state.projectName !== projectName) {
+        projectName = state.projectName;
+        const projChip = document.querySelector(".project-chip b");
+        if (projChip) projChip.textContent = projectName;
+      }
+
+      // Update sequence info in timeline
+      const tlTitle = document.querySelector(".tl-toolbar .title");
+      if (tlTitle && state.sequence) {
+        tlTitle.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg> ${escapeHtmlMain(state.sequence)}`;
+      }
+      const tlMeta = document.querySelector(".tl-toolbar .meta");
+      if (tlMeta) {
+        const trackCount = (state.videoTracks || 0) + (state.audioTracks || 0);
+        const matchCount = [...matchIds].filter(id => {
+          const c = lastSnapshot.find(cl => cl.id === id);
+          return c && c.sequenceName === activeSequenceName;
+        }).length;
+        tlMeta.textContent = `Synced live · ${trackCount} tracks · ${matchCount} matches highlighted`;
+      }
+    } else {
+      indicator.innerHTML = '<span class="dot" style="background:var(--red); box-shadow:none;"></span> Disconnected';
+      indicator.style.opacity = "0.7";
     }
 
-    // Update sequence info in timeline
-    const tlTitle = document.querySelector(".tl-toolbar .title");
-    if (tlTitle && state.sequence) {
-      tlTitle.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg> ${escapeHtmlMain(state.sequence)}`;
+    lastSnapshot = Array.isArray(snapshotJson) ? snapshotJson : [];
+    
+    // Hide scan bar if it's visible
+    const scanBar = document.getElementById("scan-bar");
+    if (scanBar && !scanBar.classList.contains("hidden")) {
+      scanBar.classList.add("hidden");
     }
-    const tlMeta = document.querySelector(".tl-toolbar .meta");
-    if (tlMeta) {
-      const trackCount = (state.videoTracks || 0) + (state.audioTracks || 0);
-      const matchCount = [...matchIds].filter(id => {
-        const c = lastSnapshot.find(cl => cl.id === id);
-        return c && c.sequenceName === activeSequenceName;
-      }).length;
-      tlMeta.textContent = `Synced live · ${trackCount} tracks · ${matchCount} matches highlighted`;
+
+    runSearch(lastQuery, { rerenderOnly: true });
+    window.ffsRerenderTimeline();
+    updateAnalytics();
+    updatePerformanceScanner();
+
+    // Refresh layer data if visible
+    if (currentView === 'layers') {
+      renderLayerOverview();
     }
-  } else {
-    indicator.innerHTML = '<span class="dot" style="background:var(--red); box-shadow:none;"></span> Disconnected';
-    indicator.style.opacity = "0.7";
-  }
-
-  lastSnapshot = Array.isArray(snapshotJson) ? snapshotJson : [];
-  
-  // Hide scan bar if it's visible
-  const scanBar = document.getElementById("scan-bar");
-  if (scanBar && !scanBar.classList.contains("hidden")) {
-    scanBar.classList.add("hidden");
-  }
-
-  runSearch(lastQuery, { rerenderOnly: true });
-  window.ffsRerenderTimeline();
-  updateAnalytics();
-  updatePerformanceScanner();
-
-  // Refresh layer data if visible
-  if (currentView === 'layers') {
-    renderLayerOverview();
+  } catch (err) {
+    console.error("Error in pollProject:", err);
+    // Ensure scan bar is hidden even on error
+    const scanBar = document.getElementById("scan-bar");
+    if (scanBar) scanBar.classList.add("hidden");
   }
 }
 
@@ -353,7 +360,18 @@ function updateAnalytics() {
     else if (text.startsWith("Nested")) cnt.textContent = stats.nestedCount;
     else if (text.startsWith("Offline")) cnt.textContent = stats.offlineCount;
     else if (text.startsWith("Proxies")) cnt.textContent = stats.proxyCount;
-    else if (text.startsWith("Effect Presets")) cnt.textContent = [...new Set(lastSnapshot.flatMap(c => c.effects))].length;
+    else if (text.startsWith("Effect Presets")) {
+      var allFx = [];
+      for (var idx = 0; idx < lastSnapshot.length; idx++) {
+        var fxArr = lastSnapshot[idx].effects || [];
+        for (var fxIdx = 0; fxIdx < fxArr.length; fxIdx++) {
+          if (allFx.indexOf(fxArr[fxIdx]) === -1) {
+            allFx.push(fxArr[fxIdx]);
+          }
+        }
+      }
+      cnt.textContent = allFx.length;
+    }
     else if (text.startsWith("Keyframes")) cnt.textContent = stats.effectsCount;
   });
 }
