@@ -1556,8 +1556,8 @@ function openBatchEditModal(clips) {
         <div class="batch-value-row">
           <span class="batch-value-label">New Value</span>
           <input class="batch-value-input" id="bm-val-input" type="${selectedProp.type === 'number' ? 'number' : 'text'}" 
-                 placeholder="${selectedProp.type === 'number' ? 'Enter number' : 'Enter value'}${escapeHtmlMain(mixedHint)}" 
-                 value="${escapeHtmlMain(currentVal)}" />
+                 placeholder="${selectedProp.type === 'number' ? 'Enter number' : 'Enter value (e.g. 1920, 1080)'}${escapeHtmlMain(mixedHint)}" 
+                 value="${escapeHtmlMain(valStr === 'Mixed' ? '' : valStr)}" />
         </div>
       `;
       // Auto-focus the input
