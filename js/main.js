@@ -1292,6 +1292,21 @@ document.getElementById("query").addEventListener("keydown", (e) => {
   }
 });
 
+// Rescan button
+const btnRescan = document.getElementById("btn-rescan");
+if (btnRescan) {
+  btnRescan.addEventListener("click", async () => {
+    btnRescan.innerHTML = `<span class="spinner" style="width:12px;height:12px"></span> Scanning...`;
+    btnRescan.style.pointerEvents = "none";
+    await pollProject(true);
+    // Refresh current view if needed
+    const activeView = document.querySelector("#view-seg .active");
+    if (activeView) switchView(activeView.dataset.view || 'table');
+    btnRescan.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Scan Again`;
+    btnRescan.style.pointerEvents = "auto";
+  });
+}
+
 // View switching via seg buttons
 document.querySelectorAll('#view-seg button').forEach(btn => {
   btn.addEventListener('click', () => {

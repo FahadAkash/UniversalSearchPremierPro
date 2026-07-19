@@ -1154,3 +1154,29 @@ table.results tbody tr.selected::before{
 @keyframes batchSpin {
   to { transform: rotate(360deg); }
 }
+
+/* Rescan Button */
+.btn-rescan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-left: 12px;
+}
+.btn-rescan:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  border-color: var(--border-soft);
+}
+.btn-rescan svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.8;
+}

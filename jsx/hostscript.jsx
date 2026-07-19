@@ -817,3 +817,88 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
         return JSON.stringify({ success: false, error: e.toString() });
     }
 }
+
+function ffs_getProjectStats() {
+    try {
+        var stats = {
+            sequenceCount: 0,
+            totalVideoClips: 0,
+            totalAudioClips: 0,
+            totalEffects: 0,
+            totalMarkers: 0,
+            totalProjectItems: 0,
+            offlineCount: 0,
+            totalBins: 0,
+            effectUsage: {}
+        };
+
+        if (app.project) {
+            stats.sequenceCount = app.project.sequences ? app.project.sequences.numSequences : 0;
+            
+            // Project Items
+            function _traverseStats(item) {
+                if (!item) return;
+                var isRoot = (item.type === ProjectItemType.ROOT);
+                var isBin = (item.type === ProjectItemType.BIN);
+                
+                if (!isRoot) {
+                    stats.totalProjectItems++;
+                    if (isBin) stats.totalBins++;
+                    try { if (item.isOffline && item.isOffline()) stats.offlineCount++; } catch(e) {}
+                }
+                
+                if (item.children) {
+                    for (var i = 0; i < item.children.numItems; i++) {
+                        _traverseStats(item.children[i]);
+                    }
+                }
+            }
+            if (app.project.rootItem) _traverseStats(app.project.rootItem);
+
+            // Sequences (Clips & Effects & Markers)
+            for (var s = 0; s < app.project.sequences.numSequences; s++) {
+                var seq = app.project.sequences[s];
+                
+                // Markers
+                try {
+                    if (seq.markers) stats.totalMarkers += seq.markers.numMarkers;
+                } catch(e) {}
+
+                var trackGroups = [
+                    { list: seq.videoTracks, type: "V" },
+                    { list: seq.audioTracks, type: "A" }
+                ];
+
+                for (var g = 0; g < trackGroups.length; g++) {
+                    var list = trackGroups[g].list;
+                    for (var t = 0; t < list.numTracks; t++) {
+                        var track = list[t];
+                        for (var c = 0; c < track.clips.numItems; c++) {
+                            var clip = track.clips[c];
+                            if (trackGroups[g].type === "V") stats.totalVideoClips++;
+                            else stats.totalAudioClips++;
+
+                            if (clip.components) {
+                                for (var k = 0; k < clip.components.numItems; k++) {
+                                    var comp = clip.components[k];
+                                    if (comp.displayName !== "Opacity" && comp.displayName !== "Motion" && comp.displayName !== "Volume" && comp.displayName !== "Audio Clip Mixer") {
+                                        stats.totalEffects++;
+                                        if (stats.effectUsage[comp.displayName]) {
+                                            stats.effectUsage[comp.displayName]++;
+                                        } else {
+                                            stats.effectUsage[comp.displayName] = 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return JSON.stringify(stats);
+    } catch (e) {
+        return JSON.stringify({ error: e.toString() });
+    }
+}
