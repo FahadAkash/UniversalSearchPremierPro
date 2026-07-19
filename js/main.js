@@ -1399,6 +1399,8 @@ function openBatchEditModal(clips) {
         const strVal = String(value).toLowerCase();
         if (strVal === "true" || strVal === "false") {
           entry.type = "boolean";
+        } else if (typeof value === "string" && value.includes(",")) {
+          entry.type = "text"; // arrays represented as comma-separated strings
         } else if (typeof value === "number" || (!isNaN(parseFloat(value)) && value !== "")) {
           if (entry.type !== "boolean") entry.type = "number";
         } else if (typeof value === "string" && value !== "") {

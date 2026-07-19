@@ -691,7 +691,6 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
     var count = 0;
     try {
         var clipIds = JSON.parse(clipIdsJson);
-        var targetVal = isString ? newValue : parseFloat(newValue);
         var parsedIds = [];
         for (var i = 0; i < clipIds.length; i++) {
             var parts = clipIds[i].split("_");
@@ -734,6 +733,29 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
                         }
                         
                         if (key === squashedPropertyName) {
+                            var targetVal;
+                            var originalVal = prop.getValue();
+                            
+                            // If original is array, attempt to parse newValue into an array
+                            if (originalVal !== undefined && originalVal !== null && typeof originalVal === 'object' && originalVal.length !== undefined) {
+                                if (isString && typeof newValue === 'string') {
+                                    var parts = newValue.split(',');
+                                    var arr = [];
+                                    for (var j = 0; j < parts.length; j++) {
+                                        arr.push(parseFloat(parts[j]));
+                                    }
+                                    targetVal = arr;
+                                } else {
+                                    // if they just sent a number but it expects an array (e.g. they typed "100" instead of "100, 100")
+                                    var num = parseFloat(newValue);
+                                    var arr = [];
+                                    for (var j = 0; j < originalVal.length; j++) arr.push(num);
+                                    targetVal = arr;
+                                }
+                            } else {
+                                targetVal = isString ? newValue : parseFloat(newValue);
+                            }
+
                             prop.setValue(targetVal, 1);
                             count++;
                         }
