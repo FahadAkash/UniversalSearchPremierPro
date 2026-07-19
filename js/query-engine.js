@@ -16,18 +16,28 @@ const UNSUPPORTED_KEYS = new Set([
 
 function parseQuery(raw) {
   const tokens = [];
-  // Matches key:value or key>=value, key<=value, key>value, key<value, key!=value, key=value
-  const re = /(\w[\w.]*)?\s*(>=|<=|>|<|!=|:|=)\s*("([^"]*)"|[^\s]+)/g;
+  // Match key:value or key>=value etc. Allows spaces in key.
+  const re = /([\w\s]+?)\s*(>=|<=|>|<|!=|:|=)\s*("([^"]*)"|[^\s]+)/g;
   let m;
   while ((m = re.exec(raw)) !== null) {
     tokens.push({ 
-      key: (m[1] || "text").toLowerCase(), 
+      key: (m[1] || "text").trim().replace(/\s+/g, "").toLowerCase(), 
       op: m[2], 
       value: (m[4] !== undefined ? m[4] : m[3]) 
     });
   }
-  // fallback: bare text search if nothing matched a key:value pattern
+  
+  // If no operators were found, check if it's a space-separated expression like "uniform scale true"
   if (tokens.length === 0 && raw.trim().length > 0) {
+    const parts = raw.trim().split(/\s+/);
+    if (parts.length > 1) {
+      const lastWord = parts[parts.length - 1].toLowerCase();
+      if (["true", "false", "on", "off", "0", "1"].includes(lastWord) || !isNaN(parseFloat(lastWord))) {
+        const key = parts.slice(0, -1).join("").toLowerCase();
+        tokens.push({ key: key, op: ":", value: lastWord });
+        return tokens;
+      }
+    }
     tokens.push({ key: "text", op: ":", value: raw.trim() });
   }
   return tokens;

@@ -176,6 +176,7 @@ async function pollProject() {
     window.ffsRerenderTimeline();
     updateAnalytics();
     updatePerformanceScanner();
+    updateSuggestions();
 
     // Refresh layer data if visible
     if (currentView === 'layers') {
@@ -948,6 +949,35 @@ async function renderScannerDashboard() {
 function renderSavedSearches() {
   const cnt = document.querySelector('.saved-searches-cnt');
   if (cnt) cnt.textContent = savedSearches.length;
+}
+
+// ===================== AUTOCOMPLETE SUGGESTIONS =====================
+function updateSuggestions() {
+  const dl = document.getElementById("search-suggestions");
+  if (!dl) return;
+  const paramKeys = new Set([
+    "effect:", "duration:", "sequence:", "nested:true", "adjustment:true", 
+    "text:", "mediatype:", "track:", "camera:", "fps:", "label:", "resolution:", 
+    "codec:", "offline:true", "proxy:true", "volume:", "opacity:", "scale:", 
+    "rotation:", "name:", "graphic:true", "hasmarkers:true", "has_effects:true", 
+    "animpresets:true", "motionmodified:true", "haskeyframes:true", 
+    "audioeffects:true", "lumetri:true", "hascolorlabel:true"
+  ]);
+  
+  // Dynamically extract unique effect parameters across all clips
+  lastSnapshot.forEach(c => {
+    if (c.effectParams) {
+      for (const k in c.effectParams) {
+        paramKeys.add(k + ":");
+      }
+    }
+    if (c.effects) {
+      c.effects.forEach(fx => paramKeys.add('effect:"' + fx + '"'));
+    }
+  });
+
+  const html = Array.from(paramKeys).map(k => `<option value="${escapeHtmlMain(k)}"></option>`).join("");
+  dl.innerHTML = html;
 }
 
 // ===================== UTILITIES =====================
