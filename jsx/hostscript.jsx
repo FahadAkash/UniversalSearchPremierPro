@@ -56,10 +56,13 @@ function ffs_getProjectSnapshot() {
 
                     var isGraphic = false;
                     var isText = false;
+                    var keyframeCount = 0;
+                    var hasLumetri = false;
                     try {
                         for (var k = 0; k < clip.components.numItems; k++) {
                             var comp = clip.components[k];
                             effects.push(comp.displayName);
+                            if (comp.displayName.indexOf("Lumetri Color") !== -1) hasLumetri = true;
 
                             if (comp.displayName === "Graphic Parameters" || comp.displayName.indexOf("Essential Graphics") !== -1) {
                                 isGraphic = true;
@@ -91,6 +94,15 @@ function ffs_getProjectSnapshot() {
                                     var prop = comp.properties[p];
                                     if (prop.displayName === "Level" || prop.displayName === "Volume") volume = prop.getValue();
                                 }
+                            }
+                            
+                            // Check for keyframes on properties
+                            for (var p = 0; p < comp.properties.numItems; p++) {
+                                try {
+                                    if (comp.properties[p].isTimeVarying && comp.properties[p].isTimeVarying()) {
+                                        keyframeCount += comp.properties[p].getKeys ? comp.properties[p].getKeys().length : 1;
+                                    }
+                                } catch(e) {}
                             }
                         }
                     } catch (e) { /* audio clips / no components */ }
@@ -210,9 +222,55 @@ function ffs_getProjectSnapshot() {
                         fps: fps,
                         resolution: resolution,
                         codec: codec,
-                        colorLabel: colorLabel
+                        colorLabel: colorLabel,
+                        keyframeCount: keyframeCount,
+                        hasLumetri: hasLumetri
                     });
                 }
+                
+                // Also parse transitions on this track
+                try {
+                    if (track.transitions) {
+                        for (var tr = 0; tr < track.transitions.numItems; tr++) {
+                            var trans = track.transitions[tr];
+                            out.push({
+                                id: _clipId(s, type, t, "TR_" + tr),
+                                sequenceIndex: s,
+                                sequenceName: seqName,
+                                trackType: "T",
+                                trackIndex: t,
+                                clipIndex: "TR_" + tr,
+                                name: trans.name || "Transition",
+                                start: trans.start ? trans.start.seconds : 0,
+                                end: trans.end ? trans.end.seconds : 0,
+                                duration: (trans.end && trans.start) ? (trans.end.seconds - trans.start.seconds) : 0,
+                                mediaType: "Transition",
+                                effects: [],
+                                nested: false,
+                                adjustment: false,
+                                isGraphic: false,
+                                isText: false,
+                                isTitle: false,
+                                isCaption: false,
+                                markerCount: 0,
+                                mediaPath: "",
+                                scale: 100,
+                                opacity: 100,
+                                rotation: 0,
+                                volume: 0,
+                                position: "960, 540",
+                                offline: false,
+                                camera: "",
+                                fps: "",
+                                resolution: "",
+                                codec: "",
+                                colorLabel: "",
+                                keyframeCount: 0,
+                                hasLumetri: false
+                            });
+                        }
+                    }
+                } catch(e) {}
             }
         }
         
@@ -249,12 +307,13 @@ function ffs_getProjectSnapshot() {
             resolution: "",
             codec: "",
             proxy: false,
-            colorLabel: ""
+            colorLabel: "",
+            keyframeCount: 0,
+            hasLumetri: false
         });
     }
     return JSON.stringify(out);
 }
-
 // Selects clips by ID and focuses them in timeline
 function ffs_selectClips(idsJson) {
     try {

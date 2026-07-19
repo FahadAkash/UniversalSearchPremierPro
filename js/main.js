@@ -368,7 +368,15 @@ function updateAnalytics() {
     titleCount: lastSnapshot.filter(c => c.isTitle).length,
     textCount: lastSnapshot.filter(c => c.isText).length,
     markerCount: lastSnapshot.filter(c => c.markerCount > 0).length,
-    effectsCount: lastSnapshot.reduce((acc, c) => acc + c.effects.length, 0),
+    transitions: lastSnapshot.filter(c => c.mediaType === "Transition").length,
+    animPresets: lastSnapshot.filter(c => c.keyframeCount > 0).length,
+    motionModified: lastSnapshot.filter(c => c.scale !== 100 || c.rotation !== 0 || c.position !== "960, 540").length,
+    totalKeyframes: lastSnapshot.reduce((acc, c) => acc + (c.keyframeCount || 0), 0),
+    audioEffects: lastSnapshot.filter(c => c.trackType === "A" && c.effects && c.effects.length > 0).length,
+    lumetri: lastSnapshot.filter(c => c.hasLumetri).length,
+    colors: lastSnapshot.filter(c => c.isGraphic).length,
+    fonts: lastSnapshot.filter(c => c.isText || c.isTitle).length,
+    effectsCount: lastSnapshot.reduce((acc, c) => acc + (c.effects ? c.effects.length : 0), 0),
     offlineCount: lastSnapshot.filter(c => c.offline).length,
     proxyCount: lastSnapshot.filter(c => c.proxy).length,
     noProxyCount: lastSnapshot.filter(c => !c.proxy && c.trackType === "V" && !c.nested).length,
@@ -404,7 +412,24 @@ function updateAnalytics() {
       }
       cnt.textContent = allFx.length;
     }
-    else if (text.startsWith("Keyframes")) cnt.textContent = stats.effectsCount;
+    else if (text.startsWith("Transitions")) cnt.textContent = stats.transitions;
+    else if (text.startsWith("Animation Presets")) cnt.textContent = stats.animPresets;
+    else if (text.startsWith("Motion Properties")) cnt.textContent = stats.motionModified;
+    else if (text.startsWith("Keyframes")) cnt.textContent = stats.totalKeyframes;
+    else if (text.startsWith("Audio Effects")) cnt.textContent = stats.audioEffects;
+    else if (text.startsWith("Lumetri")) cnt.textContent = stats.lumetri;
+    else if (text.startsWith("Color Labels")) {
+      var allLabels = [];
+      for (var i = 0; i < lastSnapshot.length; i++) {
+        var lbl = lastSnapshot[i].colorLabel;
+        if (lbl && lbl !== "0" && allLabels.indexOf(lbl) === -1) {
+          allLabels.push(lbl);
+        }
+      }
+      cnt.textContent = allLabels.length;
+    }
+    else if (text.startsWith("Fonts")) cnt.textContent = stats.fonts;
+    else if (text.startsWith("Colors")) cnt.textContent = stats.colors;
   });
 }
 
@@ -907,7 +932,27 @@ document.querySelectorAll(".nav-item").forEach(item => {
     } else if (text.startsWith("Unused Media")) {
       queryInput.value = "unused:true";
     } else if (text.startsWith("Markers")) {
-      queryInput.value = "marker:*";
+      queryInput.value = "hasmarkers:true";
+    } else if (text.startsWith("Effect Presets")) {
+      queryInput.value = "has_effects:true";
+    } else if (text.startsWith("Transitions")) {
+      queryInput.value = "mediatype:transition";
+    } else if (text.startsWith("Animation Presets")) {
+      queryInput.value = "animpresets:true";
+    } else if (text.startsWith("Motion Properties")) {
+      queryInput.value = "motionmodified:true";
+    } else if (text.startsWith("Keyframes")) {
+      queryInput.value = "haskeyframes:true";
+    } else if (text.startsWith("Audio Effects")) {
+      queryInput.value = "audioeffects:true";
+    } else if (text.startsWith("Lumetri")) {
+      queryInput.value = "lumetri:true";
+    } else if (text.startsWith("Color Labels")) {
+      queryInput.value = "hascolorlabel:true";
+    } else if (text.startsWith("Fonts")) {
+      queryInput.value = "hasfonts:true";
+    } else if (text.startsWith("Colors")) {
+      queryInput.value = "graphic:true";
     } else if (text.startsWith("Project Analytics")) {
       switchView("analytics");
       return;

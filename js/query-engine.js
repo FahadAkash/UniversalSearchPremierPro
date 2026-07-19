@@ -4,7 +4,9 @@ const SUPPORTED_KEYS = new Set([
   "effect", "duration", "sequence", "nested", "adjustment", "text", "mediatype", "track",
   "camera", "fps", "label", "resolution", "codec", "offline", "proxy",
   "volume", "opacity", "scale", "rotation", "name", "all",
-  "graphic", "caption", "title", "textlayer", "hasmarkers"
+  "graphic", "caption", "title", "textlayer", "hasmarkers",
+  "has_effects", "animpresets", "motionmodified", "haskeyframes",
+  "audioeffects", "lumetri", "hascolorlabel", "hasfonts"
 ]);
 
 const UNSUPPORTED_KEYS = new Set([
@@ -68,6 +70,27 @@ function runQuery(clips, raw) {
       }
     } else if (t.key === "sequence") {
       matches = matches.filter(c => c.sequenceName.toLowerCase().includes(needle));
+    } else if (t.key === "has_effects") {
+      const want = needle === "true";
+      matches = matches.filter(c => (c.effects && c.effects.length > 0) === want);
+    } else if (t.key === "animpresets" || t.key === "haskeyframes") {
+      const want = needle === "true";
+      matches = matches.filter(c => (c.keyframeCount > 0) === want);
+    } else if (t.key === "motionmodified") {
+      const want = needle === "true";
+      matches = matches.filter(c => (c.scale !== 100 || c.rotation !== 0 || c.position !== "960, 540") === want);
+    } else if (t.key === "audioeffects") {
+      const want = needle === "true";
+      matches = matches.filter(c => (c.trackType === "A" && c.effects && c.effects.length > 0) === want);
+    } else if (t.key === "lumetri") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!c.hasLumetri === want);
+    } else if (t.key === "hascolorlabel") {
+      const want = needle === "true";
+      matches = matches.filter(c => (c.colorLabel && c.colorLabel !== "0") === want);
+    } else if (t.key === "hasfonts") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!(c.isText || c.isTitle) === want);
     } else if (t.key === "nested") {
       const want = needle === "true";
       matches = matches.filter(c => !!c.nested === want);
@@ -99,6 +122,8 @@ function runQuery(clips, raw) {
         matches = matches.filter(c => c.trackType === "A");
       } else if (needle === "sequence") {
         matches = matches.filter(c => c.trackType === "S");
+      } else if (needle === "transition") {
+        matches = matches.filter(c => c.trackType === "T");
       } else {
         matches = matches.filter(c => c.trackType && c.trackType.toLowerCase() === needle);
       }
