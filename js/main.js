@@ -1121,7 +1121,10 @@ document.querySelectorAll(".nav-item").forEach(item => {
     }
 
     switchView("table");
-    runSearch(queryInput.value);
+    activeQueries = [queryInput.value];
+    queryInput.value = "";
+    renderActiveChips();
+    runSearch(activeQueries[0]);
   });
 });
 
@@ -1137,8 +1140,13 @@ document.getElementById("auto-select-chk").addEventListener("change", (e) => {
   autoSelectEnabled = e.target.checked;
 });
 
-// Search input
-document.getElementById("query").addEventListener("input", (e) => runSearch(e.target.value));
+// Search input will now be handled by Run button and Enter key
+document.getElementById("query").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.querySelector(".btn-ai-run").click();
+  }
+});
 
 // View switching via seg buttons
 document.querySelectorAll('#view-seg button').forEach(btn => {
@@ -1147,11 +1155,63 @@ document.querySelectorAll('#view-seg button').forEach(btn => {
   });
 });
 
+let activeQueries = [];
+
+function renderActiveChips() {
+  const container = document.getElementById("active-chips-container");
+  const label = document.getElementById("active-label");
+  const sep = document.getElementById("active-sep");
+  if (!container) return;
+  
+  if (activeQueries.length === 0) {
+    container.innerHTML = "";
+    if (label) label.style.display = "none";
+    if (sep) sep.style.display = "none";
+    return;
+  }
+  
+  if (label) label.style.display = "inline";
+  if (sep) sep.style.display = "inline";
+  
+  container.innerHTML = activeQueries.map((q, idx) => `
+    <span class="chip">${escapeHtmlMain(q)} <button data-idx="${idx}" class="btn-remove-chip">✕</button></span>
+  `).join("");
+  
+  container.querySelectorAll(".btn-remove-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.idx);
+      activeQueries.splice(idx, 1);
+      renderActiveChips();
+      document.querySelector(".btn-ai-run").click(); // re-run without the chip
+    });
+  });
+}
+
 // Run button
 const btnRun = document.querySelector(".btn-ai-run");
 if (btnRun) {
-  btnRun.addEventListener("click", () => {
-    runSearch(document.getElementById("query").value);
+  btnRun.addEventListener("click", async () => {
+    const qInput = document.getElementById("query");
+    const val = qInput.value.trim();
+    if (val) {
+      activeQueries.push(val);
+      qInput.value = "";
+    }
+    renderActiveChips();
+    
+    // Show Loading state
+    const originalText = btnRun.innerHTML;
+    btnRun.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Running...`;
+    
+    // Wait a tick to let UI paint loading
+    await new Promise(r => setTimeout(r, 50));
+    
+    // Run Search with all active queries
+    const fullQuery = activeQueries.join(" ");
+    runSearch(fullQuery);
+    
+    // Restore button
+    btnRun.innerHTML = originalText;
   });
 }
 
@@ -1200,6 +1260,7 @@ document.getElementById("batch-actions").addEventListener("click", async (e) => 
 
 // Initial render of saved searches badge
 renderSavedSearches();
+renderActiveChips();
 
 // Start polling
 pollProject();
@@ -1226,4 +1287,15 @@ document.querySelectorAll(".insp-tab").forEach(tab => {
     if (metadata) metadata.classList.toggle("hidden", text !== "Metadata");
   });
 });
+
+// Suggested ghost chips
+document.querySelectorAll(".chip.ghost").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const text = chip.textContent.replace("+ ", "").trim();
+    activeQueries.push(text);
+    renderActiveChips();
+    document.querySelector(".btn-ai-run").click();
+  });
+});
+
 

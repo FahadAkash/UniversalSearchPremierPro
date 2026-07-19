@@ -70,11 +70,9 @@
     </div>
 
     <div class="chip-row">
-      <span class="label">Active</span>
-      <span class="chip">effect:"Warp Stabilizer" <button>✕</button></span>
-      <span class="chip">volume&gt;6 <button>✕</button></span>
-      <span class="chip">unused:true <button>✕</button></span>
-      <span class="sep"></span>
+      <span class="label" id="active-label" style="display:none;">Active</span>
+      <span id="active-chips-container"></span>
+      <span class="sep" id="active-sep" style="display:none;"></span>
       <span class="label">Suggested</span>
       <span class="chip ghost">+ opacity&lt;50</span>
       <span class="chip ghost">+ fps:60</span>
