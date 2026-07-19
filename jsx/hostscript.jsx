@@ -159,7 +159,7 @@ function ffs_getProjectSnapshot() {
                                         var finalDisplayName = prop.displayName;
                                         
                                         // If this key already exists for this clip, disambiguate using internal name
-                                        if (effectParams[key] !== undefined) {
+                                        if (effectParams.hasOwnProperty(key)) {
                                             var internalName = prop.name || String(p);
                                             // Clean up internal name for UI if possible (e.g. ADBE Levels-0002 -> Levels-0002)
                                             internalName = internalName.replace(/^ADBE\s*/, "");
@@ -716,7 +716,7 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
                         var rawKey = prop.displayName.toLowerCase().replace(/\s+/g, "");
                         var key = rawKey;
                         
-                        if (localNames[key] !== undefined) {
+                        if (localNames.hasOwnProperty(key)) {
                             var internalName = prop.name || String(pr);
                             internalName = internalName.replace(/^ADBE\s*/, "");
                             var finalDisplayName = prop.displayName + " (" + internalName + ")";

@@ -99,6 +99,7 @@ function translateAILanguage(input) {
   return lower; // fallback
 }
 let isPolling = false;
+let pollQueued = false;
 let lastInteractionTime = 0;
 
 // Track user interactions to pause polling, keeping ExtendScript engine free for instant selection
@@ -107,7 +108,10 @@ document.addEventListener("keydown", () => { lastInteractionTime = Date.now(); }
 document.addEventListener("click", () => { lastInteractionTime = Date.now(); });
 
 async function pollProject(force = false) {
-  if (isPolling) return;
+  if (isPolling) {
+    if (force) pollQueued = true;
+    return;
+  }
   // If the user has interacted within the last 1500ms, skip polling
   if (!force && Date.now() - lastInteractionTime < 1500) return;
   
@@ -189,6 +193,10 @@ async function pollProject(force = false) {
     if (scanBar) scanBar.classList.add("hidden");
   } finally {
     isPolling = false;
+    if (pollQueued) {
+      pollQueued = false;
+      pollProject(true);
+    }
   }
 }
 
@@ -989,6 +997,21 @@ function updateSuggestions() {
     icon: "⚙️"
   }));
   
+  // Pre-seed the system with common built-in Premiere Pro effects
+  // so that "intelligence" always works even if the effect isn't applied yet.
+  const COMMON_EFFECTS = [
+    "Lumetri Color", "Transform", "Crop", "Gaussian Blur", "Warp Stabilizer",
+    "Ultra Key", "ProcAmp", "Levels", "Color Key", "Basic 3D", "Drop Shadow",
+    "Directional Blur", "Noise", "Mosaic", "Luma Key", "Track Matte Key",
+    "Timecode", "Tint", "Leave Color", "Extract", "Find Edges", "Black & White",
+    "Color Balance (RGB)", "Video Limiter", "Morph Cut", "Cross Dissolve",
+    "Dip to Black", "Dip to White", "Film Dissolve"
+  ];
+  
+  COMMON_EFFECTS.forEach(fx => {
+    if (!effectMap.has(fx)) effectMap.set(fx, true);
+  });
+
   const effectOptions = Array.from(effectMap.keys()).map(fx => ({
     type: "effect",
     query: 'effect:"' + fx + '"',
@@ -1455,7 +1478,19 @@ document.querySelectorAll(".chip.ghost").forEach(chip => {
     activeQueries.push(text);
     renderActiveChips();
     document.querySelector(".btn-ai-run").click();
-  });
+});
 });
 
+// Debug shortcut: Ctrl+Shift+D to dump snapshot to disk
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === "D") {
+    try {
+      const fs = require("fs");
+      fs.writeFileSync("C:/Users/fahad/.gemini/antigravity-ide/brain/3e9ad082-6137-41a2-aa51-f77369a75d9d/scratch/dump.json", JSON.stringify(lastSnapshot, null, 2));
+      alert("Snapshot dumped to scratch dir!");
+    } catch (err) {
+      alert("Dump failed: " + err);
+    }
+  }
+});
 
