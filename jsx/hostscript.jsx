@@ -26,34 +26,38 @@ function _getMetadataValue(meta, fieldName) {
 function _traverseProjectBin(item, outArray) {
     if (!item) return;
     try {
-        var isBin = (item.type === 2); // ProjectItemType.BIN
-        var usage = 0;
-        try {
-            if (item.videoUsage !== undefined) usage += item.videoUsage;
-            if (item.audioUsage !== undefined) usage += item.audioUsage;
-        } catch(e) {}
+        var isRoot = (item.type === ProjectItemType.ROOT);
+        var isBin = (item.type === ProjectItemType.BIN);
         
-        var mediaPath = "";
-        try { if (item.getMediaPath) mediaPath = item.getMediaPath(); } catch(e) {}
-        
-        var isOffline = false;
-        try { if (item.isOffline) isOffline = item.isOffline(); } catch(e) {}
-        
-        var hasProxy = false;
-        try { if (item.hasProxy) hasProxy = item.hasProxy(); } catch(e) {}
+        if (!isRoot) {
+            var usage = 0;
+            try {
+                if (item.videoUsage !== undefined) usage += item.videoUsage;
+                if (item.audioUsage !== undefined) usage += item.audioUsage;
+            } catch(e) {}
+            
+            var mediaPath = "";
+            try { if (item.getMediaPath) mediaPath = item.getMediaPath(); } catch(e) {}
+            
+            var isOffline = false;
+            try { if (item.isOffline) isOffline = item.isOffline(); } catch(e) {}
+            
+            var hasProxy = false;
+            try { if (item.hasProxy) hasProxy = item.hasProxy(); } catch(e) {}
 
-        outArray.push({
-            id: "proj_" + item.nodeId,
-            type: isBin ? "Bin" : "File",
-            name: item.name,
-            mediaPath: mediaPath,
-            isOffline: isOffline,
-            hasProxy: hasProxy,
-            usage: usage,
-            nodeId: item.nodeId
-        });
+            outArray.push({
+                id: "proj_" + item.nodeId,
+                type: isBin ? "Bin" : "File",
+                name: item.name,
+                mediaPath: mediaPath,
+                isOffline: isOffline,
+                hasProxy: hasProxy,
+                usage: usage,
+                nodeId: item.nodeId
+            });
+        }
         
-        if (isBin && item.children) {
+        if (item.children) {
             for (var i = 0; i < item.children.numItems; i++) {
                 _traverseProjectBin(item.children[i], outArray);
             }
