@@ -1362,106 +1362,61 @@ if (btnRun) {
 // ============ BATCH EDIT INTERACTIVE MODAL ============
 function openBatchEditModal(clips) {
   // 1. Scan all matched clips to build an effect → property → values map
+  // Uses effectParamGroups from ExtendScript which maps effectDisplayName → [squashedKey1, ...]
   const effectTree = new Map(); // effectName → Map(propDisplayName → { squashed, values: Set, type })
   
   clips.forEach(clip => {
     if (!clip.effectParams || !clip.effectParamNames) return;
     
-    // Group params by their parent effect
-    // effectParamNames maps squashedKey → originalDisplayName
-    for (const squashed in clip.effectParamNames) {
-      const displayName = clip.effectParamNames[squashed];
-      const value = clip.effectParams[squashed];
+    // Use effectParamGroups if available (maps componentDisplayName → [squashedKeys])
+    const groups = clip.effectParamGroups || {};
+    
+    for (const effectName in groups) {
+      const keys = groups[effectName];
+      if (!keys || !keys.length) continue;
       
-      // Determine which effect this param belongs to
-      let parentEffect = "Motion / Opacity"; // default for built-in params
-      if (clip.effects && clip.effects.length > 0) {
-        // Try to match by checking if the squashed name could belong to a known effect
-        // We'll do a simple heuristic: core params are position, scale, rotation, opacity, volume etc.
-        const coreParams = ["position", "scale", "scalewidth", "scaleheight", "rotation", "anchorpoint", 
-                           "uniformscale", "opacity", "antiflickerfilter", "volume", "level", "channelvolume",
-                           "cropleft", "croptop", "cropright", "cropbottom", "upperleft", "upperright",
-                           "lowerleft", "lowerright"];
-        if (!coreParams.includes(squashed)) {
-          // This is likely from an applied effect
-          // Try to find which effect it belongs to
-          parentEffect = findParentEffect(clip, squashed, displayName);
+      if (!effectTree.has(effectName)) {
+        effectTree.set(effectName, new Map());
+      }
+      const propMap = effectTree.get(effectName);
+      
+      for (var ki = 0; ki < keys.length; ki++) {
+        const squashed = keys[ki];
+        const displayName = clip.effectParamNames[squashed];
+        const value = clip.effectParams[squashed];
+        if (!displayName) continue;
+        
+        if (!propMap.has(displayName)) {
+          propMap.set(displayName, { squashed, values: new Set(), type: "unknown" });
         }
-      }
-      
-      if (!effectTree.has(parentEffect)) {
-        effectTree.set(parentEffect, new Map());
-      }
-      const propMap = effectTree.get(parentEffect);
-      
-      if (!propMap.has(displayName)) {
-        propMap.set(displayName, { squashed, values: new Set(), type: "unknown" });
-      }
-      
-      const entry = propMap.get(displayName);
-      if (value !== undefined && value !== null && value !== "") {
-        entry.values.add(String(value));
-      }
-      
-      // Detect type
-      if (value === true || value === false || value === 0 || value === 1) {
+        
+        const entry = propMap.get(displayName);
+        if (value !== undefined && value !== null && value !== "") {
+          entry.values.add(String(value));
+        }
+        
+        // Detect type
         const strVal = String(value).toLowerCase();
         if (strVal === "true" || strVal === "false") {
           entry.type = "boolean";
-        } else if (entry.type === "unknown") {
-          entry.type = "number"; // could be boolean 0/1
+        } else if (typeof value === "number" || (!isNaN(parseFloat(value)) && value !== "")) {
+          if (entry.type !== "boolean") entry.type = "number";
+        } else if (typeof value === "string" && value !== "") {
+          if (entry.type === "unknown") entry.type = "text";
         }
-      } else if (typeof value === "number" || (!isNaN(parseFloat(value)) && value !== "")) {
-        if (entry.type !== "boolean") entry.type = "number";
-      } else if (typeof value === "string" && value !== "") {
-        if (entry.type === "unknown") entry.type = "text";
-      }
-    }
-  });
-
-  // Also add core built-in params that may not have effect associations
-  const coreProps = [
-    { name: "Scale", squashed: "scale", effect: "Motion / Opacity" },
-    { name: "Scale Width", squashed: "scalewidth", effect: "Motion / Opacity" },
-    { name: "Scale Height", squashed: "scaleheight", effect: "Motion / Opacity" },
-    { name: "Rotation", squashed: "rotation", effect: "Motion / Opacity" },
-    { name: "Opacity", squashed: "opacity", effect: "Motion / Opacity" },
-    { name: "Uniform Scale", squashed: "uniformscale", effect: "Motion / Opacity" },
-    { name: "Position", squashed: "position", effect: "Motion / Opacity" },
-    { name: "Anchor Point", squashed: "anchorpoint", effect: "Motion / Opacity" },
-    { name: "Anti-flicker Filter", squashed: "antiflickerfilter", effect: "Motion / Opacity" },
-    { name: "Volume", squashed: "volume", effect: "Audio" },
-    { name: "Level", squashed: "level", effect: "Audio" },
-  ];
-  
-  coreProps.forEach(cp => {
-    const hasValues = clips.some(c => c.effectParams && c.effectParams[cp.squashed] !== undefined);
-    if (hasValues) {
-      if (!effectTree.has(cp.effect)) effectTree.set(cp.effect, new Map());
-      const propMap = effectTree.get(cp.effect);
-      if (!propMap.has(cp.name)) {
-        const vals = new Set();
-        let type = "number";
-        clips.forEach(c => {
-          if (c.effectParams && c.effectParams[cp.squashed] !== undefined) {
-            vals.add(String(c.effectParams[cp.squashed]));
-            const v = c.effectParams[cp.squashed];
-            if (v === true || v === false || String(v).toLowerCase() === "true" || String(v).toLowerCase() === "false") {
-              type = "boolean";
-            }
-          }
-        });
-        propMap.set(cp.name, { squashed: cp.squashed, values: vals, type });
       }
     }
   });
 
   // 2. Build the modal HTML
   const effectNames = Array.from(effectTree.keys()).sort((a, b) => {
-    if (a === "Motion / Opacity") return -1;
-    if (b === "Motion / Opacity") return 1;
-    if (a === "Audio") return -1;
-    if (b === "Audio") return 1;
+    // Put Motion and Opacity first, Audio second
+    const priority = ["Motion", "Opacity", "Volume", "Audio Clip Mixer"];
+    const aIdx = priority.indexOf(a);
+    const bIdx = priority.indexOf(b);
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
     return a.localeCompare(b);
   });
 
@@ -1690,28 +1645,6 @@ function openBatchEditModal(clips) {
       alert("Error: " + err);
     }
   });
-}
-
-function findParentEffect(clip, squashedKey, displayName) {
-  // Try to associate a parameter with its parent effect
-  // This is a best-effort heuristic since effectParams is flat
-  if (!clip.effects || clip.effects.length === 0) return "Other";
-  
-  // Check if the param name appears in an effect name
-  const lowerDisplay = displayName.toLowerCase();
-  for (const fx of clip.effects) {
-    const lowerFx = fx.toLowerCase();
-    // If the param display name contains part of the effect name or vice versa
-    if (lowerDisplay.includes(lowerFx) || lowerFx.includes(lowerDisplay)) {
-      return fx;
-    }
-  }
-  
-  // If there's only one non-standard effect, attribute to it
-  if (clip.effects.length === 1) return clip.effects[0];
-  
-  // Otherwise group under the first effect (most recently applied)
-  return clip.effects[clip.effects.length - 1] || "Other";
 }
 
 // Batch actions panel

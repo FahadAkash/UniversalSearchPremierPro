@@ -109,6 +109,7 @@ function ffs_getProjectSnapshot() {
                     var effects = [];
                     var effectParams = {};
                     var effectParamNames = {};
+                    var effectParamGroups = {}; // effectDisplayName -> [squashedKey1, squashedKey2, ...]
                     var keyframeCount = 0;
 
                     try {
@@ -150,6 +151,7 @@ function ffs_getProjectSnapshot() {
                             }
                             
                             // Extract all properties dynamically for arbitrary search
+                            var compGroupKeys = [];
                             for (var p = 0; p < comp.properties.numItems; p++) {
                                 try {
                                     var prop = comp.properties[p];
@@ -180,6 +182,7 @@ function ffs_getProjectSnapshot() {
                                                 effectParams[key] = val;
                                             }
                                             effectParamNames[key] = finalDisplayName;
+                                            compGroupKeys.push(key);
                                         }
                                         
                                         if (prop.isTimeVarying && prop.isTimeVarying()) {
@@ -187,6 +190,10 @@ function ffs_getProjectSnapshot() {
                                         }
                                     }
                                 } catch(e) {}
+                            }
+                            // Track which params belong to this component/effect
+                            if (compGroupKeys.length > 0) {
+                                effectParamGroups[comp.displayName] = compGroupKeys;
                             }
                         }
                     } catch (e) { /* audio clips / no components */ }
@@ -290,6 +297,7 @@ function ffs_getProjectSnapshot() {
                         effects: effects,
                         effectParams: effectParams,
                         effectParamNames: effectParamNames,
+                        effectParamGroups: effectParamGroups,
                         nested: isNested,
                         adjustment: isAdjustment,
                         isGraphic: isGraphic,
