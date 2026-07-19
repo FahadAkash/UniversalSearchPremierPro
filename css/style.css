@@ -49,6 +49,7 @@ body{
 .app{
   display:grid;
   grid-template-rows: 52px 88px 1fr 208px;
+  grid-template-columns: minmax(0, 1fr);
   height:100vh;
   width:100vw;
 }
@@ -249,7 +250,7 @@ input{ font-family:inherit; }
 /* ============ BODY GRID ============ */
 .body{
   display:grid;
-  grid-template-columns: 232px 1fr 296px;
+  grid-template-columns: 232px minmax(0, 1fr) 296px;
   overflow:hidden;
 }
 

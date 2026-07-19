@@ -97,8 +97,10 @@ function translateAILanguage(input) {
 
   return lower; // fallback
 }
-
+let isPolling = false;
 async function pollProject() {
+  if (isPolling) return;
+  isPolling = true;
   try {
     const t0 = performance.now();
     const [snapshotJson, stateJson] = await Promise.all([
@@ -167,6 +169,8 @@ async function pollProject() {
     // Ensure scan bar is hidden even on error
     const scanBar = document.getElementById("scan-bar");
     if (scanBar) scanBar.classList.add("hidden");
+  } finally {
+    isPolling = false;
   }
 }
 
@@ -847,7 +851,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
     item.classList.add("active");
 
     if (text.startsWith("All Results")) {
-      queryInput.value = "";
+      queryInput.value = "all:true";
     } else if (text.startsWith("Video Clips")) {
       queryInput.value = "mediatype:video";
     } else if (text.startsWith("Audio Clips")) {

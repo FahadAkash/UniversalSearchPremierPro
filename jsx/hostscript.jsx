@@ -9,12 +9,9 @@ function _clipId(seqIndex, trackType, trackIndex, clipIndex) {
     return "seq" + seqIndex + "_" + trackType + trackIndex + "_c" + clipIndex;
 }
 
-function _getMetadataValue(projectItem, fieldName) {
-    if (!projectItem) return "";
+function _getMetadataValue(meta, fieldName) {
+    if (!meta) return "";
     try {
-        var meta = projectItem.getProjectMetadata();
-        if (!meta) return "";
-
         var tagRegex = new RegExp("<(?:[^:>]+:)?(" + fieldName + ")>([^<]+)<\\/(?:[^:>]+:)?\\1>", "i");
         var tagMatch = meta.match(tagRegex);
         if (tagMatch) return tagMatch[2];
@@ -31,6 +28,8 @@ function _getMetadataValue(projectItem, fieldName) {
 function ffs_getProjectSnapshot() {
     var out = [];
     if (!app.project) return JSON.stringify(out);
+    
+    var metadataCache = {};
 
     for (var s = 0; s < app.project.sequences.numSequences; s++) {
         var seq = app.project.sequences[s];
@@ -102,11 +101,24 @@ function ffs_getProjectSnapshot() {
                             proxy = clip.projectItem.hasProxy();
                             colorLabel = clip.projectItem.getColorLabel ? clip.projectItem.getColorLabel() : "";
 
+                            var meta = "";
+                            var treePath = clip.projectItem.treePath;
+                            if (treePath) {
+                                if (metadataCache[treePath] !== undefined) {
+                                    meta = metadataCache[treePath];
+                                } else {
+                                    meta = clip.projectItem.getProjectMetadata();
+                                    metadataCache[treePath] = meta;
+                                }
+                            } else {
+                                meta = clip.projectItem.getProjectMetadata();
+                            }
+
                             // Query metadata via XMP
-                            camera = _getMetadataValue(clip.projectItem, "Model") || _getMetadataValue(clip.projectItem, "CameraModel") || "";
-                            fps = _getMetadataValue(clip.projectItem, "VideoFrameRate") || "";
-                            resolution = _getMetadataValue(clip.projectItem, "VideoFrameSize") || "";
-                            codec = _getMetadataValue(clip.projectItem, "VideoCodec") || "";
+                            camera = _getMetadataValue(meta, "Model") || _getMetadataValue(meta, "CameraModel") || "";
+                            fps = _getMetadataValue(meta, "VideoFrameRate") || "";
+                            resolution = _getMetadataValue(meta, "VideoFrameSize") || "";
+                            codec = _getMetadataValue(meta, "VideoCodec") || "";
                         } catch (e) { }
                     }
 

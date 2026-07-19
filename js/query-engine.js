@@ -3,7 +3,7 @@
 const SUPPORTED_KEYS = new Set([
   "effect", "duration", "sequence", "nested", "text", "mediatype", "track",
   "camera", "fps", "label", "resolution", "codec", "offline", "proxy",
-  "volume", "opacity", "scale", "rotation", "name"
+  "volume", "opacity", "scale", "rotation", "name", "all"
 ]);
 
 const UNSUPPORTED_KEYS = new Set([
