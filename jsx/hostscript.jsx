@@ -756,7 +756,18 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
                                 targetVal = isString ? newValue : parseFloat(newValue);
                             }
 
-                            prop.setValue(targetVal, 1);
+                            if (prop.isTimeVarying && prop.isTimeVarying()) {
+                                var keys = prop.getKeys ? prop.getKeys() : [];
+                                if (keys.length > 0) {
+                                    for (var kj = 0; kj < keys.length; kj++) {
+                                        try { prop.setValueAtKey(keys[kj], targetVal, 1); } catch(e) {}
+                                    }
+                                }
+                                try { prop.setValue(targetVal, 1); } catch(e) {}
+                            } else {
+                                prop.setValue(targetVal, 1);
+                            }
+                            
                             count++;
                         }
                     }
