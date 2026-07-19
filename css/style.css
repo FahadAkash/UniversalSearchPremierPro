@@ -909,3 +909,248 @@ table.results tbody tr.selected::before{
     height: 100px;
   }
 }
+
+/* ============ BATCH EDIT MODAL ============ */
+.batch-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  animation: batchFadeIn .2s ease both;
+}
+.batch-modal-overlay.closing {
+  animation: batchFadeOut .15s ease both;
+}
+@keyframes batchFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes batchFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.batch-modal {
+  width: 520px; max-height: 80vh;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,77,255,0.1);
+  display: flex; flex-direction: column;
+  animation: batchSlideUp .25s ease both;
+  overflow: hidden;
+}
+.batch-modal-overlay.closing .batch-modal {
+  animation: batchSlideDown .15s ease both;
+}
+@keyframes batchSlideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes batchSlideDown {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(16px) scale(0.97); }
+}
+
+.batch-modal-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.batch-modal-header svg { color: var(--accent); flex-shrink: 0; }
+.batch-modal-title {
+  font-size: 15px; font-weight: 700; color: var(--text-1);
+  flex: 1;
+}
+.batch-modal-subtitle {
+  font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono); font-weight: 500;
+}
+.batch-modal-close {
+  width: 28px; height: 28px; border-radius: 7px;
+  border: none; background: transparent; color: var(--text-3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+.batch-modal-close:hover {
+  background: var(--bg-hover); color: var(--text-1);
+}
+
+.batch-modal-body {
+  flex: 1; overflow-y: auto; padding: 0;
+  display: flex; flex-direction: column;
+}
+
+/* Effect tree */
+.batch-effect-tree {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.batch-tree-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-3); margin-bottom: 8px;
+}
+.batch-effect-list {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.batch-effect-chip {
+  padding: 5px 12px; border-radius: 20px;
+  font-size: 11.5px; font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all .15s ease;
+  display: flex; align-items: center; gap: 5px;
+}
+.batch-effect-chip:hover {
+  border-color: var(--accent);
+  color: var(--text-1);
+  background: var(--accent-soft);
+}
+.batch-effect-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft-2);
+  color: var(--text-1);
+}
+.batch-effect-chip .chip-count {
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--text-3); font-weight: 500;
+}
+
+/* Property list */
+.batch-prop-area {
+  flex: 1; overflow-y: auto; padding: 12px 16px;
+  min-height: 120px;
+}
+.batch-prop-empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 100px; color: var(--text-3);
+  font-size: 12px; font-style: italic;
+}
+
+.batch-prop-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 8px;
+  cursor: pointer; transition: all .12s ease;
+  border: 1px solid transparent;
+}
+.batch-prop-row:hover {
+  background: var(--bg-hover);
+}
+.batch-prop-row.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.batch-prop-name {
+  font-size: 12.5px; font-weight: 500; color: var(--text-1);
+  flex: 1; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.batch-prop-val {
+  font-size: 11.5px; font-family: var(--font-mono);
+  color: var(--accent); font-weight: 500;
+  white-space: nowrap;
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+}
+.batch-prop-type {
+  font-size: 9.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-panel-2); color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* Value editor */
+.batch-value-editor {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.batch-value-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.batch-value-label {
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  min-width: 60px;
+}
+.batch-value-input {
+  flex: 1; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg); color: var(--text-1);
+  font-size: 13px; font-family: var(--font-ui);
+  outline: none; transition: border-color .15s;
+}
+.batch-value-input:focus {
+  border-color: var(--accent);
+}
+.batch-toggle-group {
+  display: flex; gap: 0; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.batch-toggle-btn {
+  flex: 1; padding: 7px 14px; border: none;
+  background: var(--bg); color: var(--text-3);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all .12s;
+}
+.batch-toggle-btn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+.batch-toggle-btn.active {
+  background: var(--accent); color: white;
+}
+.batch-toggle-btn:hover:not(.active) {
+  background: var(--bg-hover); color: var(--text-1);
+}
+
+/* Footer */
+.batch-modal-footer {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+.batch-footer-info {
+  flex: 1; font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono);
+}
+.batch-footer-info b { color: var(--text-2); }
+.batch-cancel-btn {
+  padding: 8px 18px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text-2);
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer; transition: all .12s;
+}
+.batch-cancel-btn:hover {
+  background: var(--bg-hover); color: var(--text-1);
+}
+.batch-apply-btn {
+  padding: 8px 22px; border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: white; font-size: 12.5px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  box-shadow: 0 2px 12px rgba(124,77,255,0.3);
+}
+.batch-apply-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(124,77,255,0.4);
+}
+.batch-apply-btn:disabled {
+  opacity: 0.4; cursor: not-allowed;
+  transform: none; box-shadow: none;
+}
+.batch-apply-btn .spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white; border-radius: 50%;
+  animation: batchSpin .6s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes batchSpin {
+  to { transform: rotate(360deg); }
+}

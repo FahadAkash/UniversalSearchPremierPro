@@ -1359,6 +1359,361 @@ if (btnRun) {
   });
 }
 
+// ============ BATCH EDIT INTERACTIVE MODAL ============
+function openBatchEditModal(clips) {
+  // 1. Scan all matched clips to build an effect → property → values map
+  const effectTree = new Map(); // effectName → Map(propDisplayName → { squashed, values: Set, type })
+  
+  clips.forEach(clip => {
+    if (!clip.effectParams || !clip.effectParamNames) return;
+    
+    // Group params by their parent effect
+    // effectParamNames maps squashedKey → originalDisplayName
+    for (const squashed in clip.effectParamNames) {
+      const displayName = clip.effectParamNames[squashed];
+      const value = clip.effectParams[squashed];
+      
+      // Determine which effect this param belongs to
+      let parentEffect = "Motion / Opacity"; // default for built-in params
+      if (clip.effects && clip.effects.length > 0) {
+        // Try to match by checking if the squashed name could belong to a known effect
+        // We'll do a simple heuristic: core params are position, scale, rotation, opacity, volume etc.
+        const coreParams = ["position", "scale", "scalewidth", "scaleheight", "rotation", "anchorpoint", 
+                           "uniformscale", "opacity", "antiflickerfilter", "volume", "level", "channelvolume",
+                           "cropleft", "croptop", "cropright", "cropbottom", "upperleft", "upperright",
+                           "lowerleft", "lowerright"];
+        if (!coreParams.includes(squashed)) {
+          // This is likely from an applied effect
+          // Try to find which effect it belongs to
+          parentEffect = findParentEffect(clip, squashed, displayName);
+        }
+      }
+      
+      if (!effectTree.has(parentEffect)) {
+        effectTree.set(parentEffect, new Map());
+      }
+      const propMap = effectTree.get(parentEffect);
+      
+      if (!propMap.has(displayName)) {
+        propMap.set(displayName, { squashed, values: new Set(), type: "unknown" });
+      }
+      
+      const entry = propMap.get(displayName);
+      if (value !== undefined && value !== null && value !== "") {
+        entry.values.add(String(value));
+      }
+      
+      // Detect type
+      if (value === true || value === false || value === 0 || value === 1) {
+        const strVal = String(value).toLowerCase();
+        if (strVal === "true" || strVal === "false") {
+          entry.type = "boolean";
+        } else if (entry.type === "unknown") {
+          entry.type = "number"; // could be boolean 0/1
+        }
+      } else if (typeof value === "number" || (!isNaN(parseFloat(value)) && value !== "")) {
+        if (entry.type !== "boolean") entry.type = "number";
+      } else if (typeof value === "string" && value !== "") {
+        if (entry.type === "unknown") entry.type = "text";
+      }
+    }
+  });
+
+  // Also add core built-in params that may not have effect associations
+  const coreProps = [
+    { name: "Scale", squashed: "scale", effect: "Motion / Opacity" },
+    { name: "Scale Width", squashed: "scalewidth", effect: "Motion / Opacity" },
+    { name: "Scale Height", squashed: "scaleheight", effect: "Motion / Opacity" },
+    { name: "Rotation", squashed: "rotation", effect: "Motion / Opacity" },
+    { name: "Opacity", squashed: "opacity", effect: "Motion / Opacity" },
+    { name: "Uniform Scale", squashed: "uniformscale", effect: "Motion / Opacity" },
+    { name: "Position", squashed: "position", effect: "Motion / Opacity" },
+    { name: "Anchor Point", squashed: "anchorpoint", effect: "Motion / Opacity" },
+    { name: "Anti-flicker Filter", squashed: "antiflickerfilter", effect: "Motion / Opacity" },
+    { name: "Volume", squashed: "volume", effect: "Audio" },
+    { name: "Level", squashed: "level", effect: "Audio" },
+  ];
+  
+  coreProps.forEach(cp => {
+    const hasValues = clips.some(c => c.effectParams && c.effectParams[cp.squashed] !== undefined);
+    if (hasValues) {
+      if (!effectTree.has(cp.effect)) effectTree.set(cp.effect, new Map());
+      const propMap = effectTree.get(cp.effect);
+      if (!propMap.has(cp.name)) {
+        const vals = new Set();
+        let type = "number";
+        clips.forEach(c => {
+          if (c.effectParams && c.effectParams[cp.squashed] !== undefined) {
+            vals.add(String(c.effectParams[cp.squashed]));
+            const v = c.effectParams[cp.squashed];
+            if (v === true || v === false || String(v).toLowerCase() === "true" || String(v).toLowerCase() === "false") {
+              type = "boolean";
+            }
+          }
+        });
+        propMap.set(cp.name, { squashed: cp.squashed, values: vals, type });
+      }
+    }
+  });
+
+  // 2. Build the modal HTML
+  const effectNames = Array.from(effectTree.keys()).sort((a, b) => {
+    if (a === "Motion / Opacity") return -1;
+    if (b === "Motion / Opacity") return 1;
+    if (a === "Audio") return -1;
+    if (b === "Audio") return 1;
+    return a.localeCompare(b);
+  });
+
+  const overlay = document.createElement("div");
+  overlay.className = "batch-modal-overlay";
+  overlay.innerHTML = `
+    <div class="batch-modal">
+      <div class="batch-modal-header">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span class="batch-modal-title">Batch Edit Properties</span>
+        <span class="batch-modal-subtitle">${clips.length} clip${clips.length !== 1 ? "s" : ""}</span>
+        <button class="batch-modal-close" id="bm-close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="batch-modal-body">
+        <div class="batch-effect-tree">
+          <div class="batch-tree-label">Effects Detected</div>
+          <div class="batch-effect-list" id="bm-effects">
+            ${effectNames.map((name, i) => {
+              const count = effectTree.get(name).size;
+              return `<div class="batch-effect-chip${i === 0 ? ' active' : ''}" data-effect="${escapeHtmlMain(name)}">
+                <span>✨</span> ${escapeHtmlMain(name)} <span class="chip-count">${count}</span>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+        <div class="batch-prop-area" id="bm-props">
+          <!-- populated dynamically -->
+        </div>
+        <div class="batch-value-editor" id="bm-editor" style="display:none;">
+          <!-- populated when a property is selected -->
+        </div>
+      </div>
+      <div class="batch-modal-footer">
+        <span class="batch-footer-info" id="bm-info">Select a property to edit</span>
+        <button class="batch-cancel-btn" id="bm-cancel">Cancel</button>
+        <button class="batch-apply-btn" id="bm-apply" disabled>Apply Changes</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  // State
+  let selectedEffect = effectNames[0] || null;
+  let selectedProp = null; // { displayName, squashed, type, values }
+
+  function renderProps() {
+    const area = document.getElementById("bm-props");
+    if (!selectedEffect || !effectTree.has(selectedEffect)) {
+      area.innerHTML = `<div class="batch-prop-empty">No properties detected</div>`;
+      return;
+    }
+    const propMap = effectTree.get(selectedEffect);
+    const entries = Array.from(propMap.entries());
+    
+    if (entries.length === 0) {
+      area.innerHTML = `<div class="batch-prop-empty">No properties found for this effect</div>`;
+      return;
+    }
+
+    area.innerHTML = entries.map(([displayName, info]) => {
+      const valArr = Array.from(info.values);
+      const valPreview = valArr.length > 3 
+        ? valArr.slice(0, 3).join(", ") + "…" 
+        : valArr.join(", ");
+      const typeLabel = info.type === "boolean" ? "BOOL" : info.type === "number" ? "NUM" : "TEXT";
+      const isSelected = selectedProp && selectedProp.displayName === displayName;
+      
+      return `<div class="batch-prop-row${isSelected ? ' selected' : ''}" data-prop="${escapeHtmlMain(displayName)}">
+        <span class="batch-prop-name">${escapeHtmlMain(displayName)}</span>
+        <span class="batch-prop-val">${escapeHtmlMain(valPreview) || "—"}</span>
+        <span class="batch-prop-type">${typeLabel}</span>
+      </div>`;
+    }).join("");
+
+    // Attach click handlers
+    area.querySelectorAll(".batch-prop-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const propName = row.dataset.prop;
+        const info = propMap.get(propName);
+        selectedProp = { displayName: propName, ...info };
+        
+        // Update selection UI
+        area.querySelectorAll(".batch-prop-row").forEach(r => r.classList.remove("selected"));
+        row.classList.add("selected");
+        
+        renderValueEditor();
+        document.getElementById("bm-apply").disabled = false;
+      });
+    });
+  }
+
+  function renderValueEditor() {
+    const editor = document.getElementById("bm-editor");
+    if (!selectedProp) {
+      editor.style.display = "none";
+      return;
+    }
+    editor.style.display = "";
+
+    const valArr = Array.from(selectedProp.values);
+    const currentVal = valArr.length === 1 ? valArr[0] : "";
+    const mixedHint = valArr.length > 1 ? ` (mixed: ${valArr.join(", ")})` : "";
+
+    if (selectedProp.type === "boolean") {
+      const isTrueNow = valArr.some(v => v.toLowerCase() === "true" || v === "1");
+      const isFalseNow = valArr.some(v => v.toLowerCase() === "false" || v === "0");
+      editor.innerHTML = `
+        <div class="batch-value-row">
+          <span class="batch-value-label">${escapeHtmlMain(selectedProp.displayName)}</span>
+          <div class="batch-toggle-group" id="bm-toggle">
+            <button class="batch-toggle-btn${isTrueNow && !isFalseNow ? ' active' : ''}" data-val="true">✓ True / On</button>
+            <button class="batch-toggle-btn${isFalseNow && !isTrueNow ? ' active' : ''}" data-val="false">✗ False / Off</button>
+          </div>
+        </div>
+      `;
+      editor.querySelectorAll(".batch-toggle-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          editor.querySelectorAll(".batch-toggle-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+        });
+      });
+    } else {
+      editor.innerHTML = `
+        <div class="batch-value-row">
+          <span class="batch-value-label">New Value</span>
+          <input class="batch-value-input" id="bm-val-input" type="${selectedProp.type === 'number' ? 'number' : 'text'}" 
+                 placeholder="${selectedProp.type === 'number' ? 'Enter number' : 'Enter value'}${escapeHtmlMain(mixedHint)}" 
+                 value="${escapeHtmlMain(currentVal)}" />
+        </div>
+      `;
+      // Auto-focus the input
+      setTimeout(() => {
+        const inp = document.getElementById("bm-val-input");
+        if (inp) { inp.focus(); inp.select(); }
+      }, 50);
+    }
+
+    document.getElementById("bm-info").innerHTML = `Editing <b>${escapeHtmlMain(selectedProp.displayName)}</b> on <b>${clips.length}</b> clips`;
+  }
+
+  // Render initial props
+  renderProps();
+
+  // Effect chip click handlers
+  document.getElementById("bm-effects").querySelectorAll(".batch-effect-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      document.getElementById("bm-effects").querySelectorAll(".batch-effect-chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      selectedEffect = chip.dataset.effect;
+      selectedProp = null;
+      document.getElementById("bm-editor").style.display = "none";
+      document.getElementById("bm-apply").disabled = true;
+      document.getElementById("bm-info").textContent = "Select a property to edit";
+      renderProps();
+    });
+  });
+
+  // Close handlers
+  function closeModal() {
+    overlay.classList.add("closing");
+    setTimeout(() => overlay.remove(), 200);
+  }
+  document.getElementById("bm-close").addEventListener("click", closeModal);
+  document.getElementById("bm-cancel").addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+
+  // Apply handler
+  document.getElementById("bm-apply").addEventListener("click", async () => {
+    if (!selectedProp) return;
+    const applyBtn = document.getElementById("bm-apply");
+    applyBtn.disabled = true;
+    applyBtn.innerHTML = `<span class="spinner"></span>Applying…`;
+
+    // Get value
+    let finalVal, isString = true;
+    if (selectedProp.type === "boolean") {
+      const activeToggle = document.querySelector("#bm-toggle .batch-toggle-btn.active");
+      if (!activeToggle) { applyBtn.innerHTML = "Apply Changes"; applyBtn.disabled = false; return; }
+      finalVal = activeToggle.dataset.val === "true" ? 1 : 0;
+      isString = false;
+    } else {
+      const inp = document.getElementById("bm-val-input");
+      const rawVal = inp ? inp.value.trim() : "";
+      if (rawVal === "") { applyBtn.innerHTML = "Apply Changes"; applyBtn.disabled = false; return; }
+      
+      if (!isNaN(parseFloat(rawVal)) && isFinite(rawVal)) {
+        finalVal = parseFloat(rawVal);
+        isString = false;
+      } else if (rawVal.toLowerCase() === "true" || rawVal.toLowerCase() === "on") {
+        finalVal = 1;
+        isString = false;
+      } else if (rawVal.toLowerCase() === "false" || rawVal.toLowerCase() === "off") {
+        finalVal = 0;
+        isString = false;
+      } else {
+        finalVal = rawVal;
+      }
+    }
+
+    const idsToEdit = Array.from(selectedIds.size > 0 ? selectedIds : new Set(clips.map(c => c.id)));
+    
+    try {
+      const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), selectedProp.squashed, finalVal, isString);
+      if (res && res.success) {
+        applyBtn.innerHTML = "✓ Applied!";
+        applyBtn.style.background = "var(--green)";
+        pollProject(true);
+        setTimeout(closeModal, 600);
+      } else {
+        applyBtn.innerHTML = "Apply Changes";
+        applyBtn.disabled = false;
+        applyBtn.style.background = "";
+        alert("Error: " + (res ? res.error : "Unknown error"));
+      }
+    } catch (err) {
+      applyBtn.innerHTML = "Apply Changes";
+      applyBtn.disabled = false;
+      alert("Error: " + err);
+    }
+  });
+}
+
+function findParentEffect(clip, squashedKey, displayName) {
+  // Try to associate a parameter with its parent effect
+  // This is a best-effort heuristic since effectParams is flat
+  if (!clip.effects || clip.effects.length === 0) return "Other";
+  
+  // Check if the param name appears in an effect name
+  const lowerDisplay = displayName.toLowerCase();
+  for (const fx of clip.effects) {
+    const lowerFx = fx.toLowerCase();
+    // If the param display name contains part of the effect name or vice versa
+    if (lowerDisplay.includes(lowerFx) || lowerFx.includes(lowerDisplay)) {
+      return fx;
+    }
+  }
+  
+  // If there's only one non-standard effect, attribute to it
+  if (clip.effects.length === 1) return clip.effects[0];
+  
+  // Otherwise group under the first effect (most recently applied)
+  return clip.effects[clip.effects.length - 1] || "Other";
+}
+
 // Batch actions panel
 document.getElementById("batch-actions").addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
@@ -1368,43 +1723,7 @@ document.getElementById("batch-actions").addEventListener("click", async (e) => 
   const currentMatches = lastSnapshot.filter(c => matchIds.has(c.id));
 
   if (action === "batch-edit") {
-    let defaultProp = "";
-    activeQueries.forEach(q => {
-      if (q.includes(":")) defaultProp = q.split(":")[0];
-    });
-
-    const propRaw = prompt("Enter the property name you want to batch edit (e.g. 'Uniform Scale' or 'Opacity'):", defaultProp);
-    if (!propRaw) return;
-
-    const valRaw = prompt(`Enter the new value for "${propRaw}":`);
-    if (valRaw === null) return;
-
-    const squashed = propRaw.toLowerCase().replace(/\s+/g, "");
-    
-    // Convert boolean-like strings
-    let isString = true;
-    let finalVal = valRaw.trim();
-    if (finalVal.toLowerCase() === "true" || finalVal.toLowerCase() === "on") {
-      finalVal = 1;
-      isString = false;
-    } else if (finalVal.toLowerCase() === "false" || finalVal.toLowerCase() === "off") {
-      finalVal = 0;
-      isString = false;
-    } else if (!isNaN(parseFloat(finalVal))) {
-      finalVal = parseFloat(finalVal);
-      isString = false;
-    }
-
-    const idsToEdit = Array.from(selectedIds.size > 0 ? selectedIds : new Set(currentMatches.map(c => c.id)));
-    if (idsToEdit.length === 0) return;
-
-    const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), squashed, finalVal, isString);
-    if (res && res.success) {
-      // Force an immediate refresh
-      pollProject();
-    } else {
-      alert("Error batch editing properties: " + (res ? res.error : "Unknown error"));
-    }
+    openBatchEditModal(currentMatches);
     return;
   } else if (action === "select-all") {
     selectedIds = new Set(currentMatches.map(c => c.id));
