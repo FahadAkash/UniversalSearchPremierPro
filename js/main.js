@@ -363,6 +363,11 @@ function updateAnalytics() {
     sequences: lastSnapshot.filter(c => c.trackType === "S").length,
     nestedCount: lastSnapshot.filter(c => c.nested).length,
     adjustmentCount: lastSnapshot.filter(c => c.adjustment).length,
+    graphicCount: lastSnapshot.filter(c => c.isGraphic).length,
+    captionCount: lastSnapshot.filter(c => c.isCaption).length,
+    titleCount: lastSnapshot.filter(c => c.isTitle).length,
+    textCount: lastSnapshot.filter(c => c.isText).length,
+    markerCount: lastSnapshot.filter(c => c.markerCount > 0).length,
     effectsCount: lastSnapshot.reduce((acc, c) => acc + c.effects.length, 0),
     offlineCount: lastSnapshot.filter(c => c.offline).length,
     proxyCount: lastSnapshot.filter(c => c.proxy).length,
@@ -380,6 +385,11 @@ function updateAnalytics() {
     else if (text.startsWith("Sequences")) cnt.textContent = stats.sequences;
     else if (text.startsWith("Nested")) cnt.textContent = stats.nestedCount;
     else if (text.startsWith("Adjustment")) cnt.textContent = stats.adjustmentCount;
+    else if (text.startsWith("Essential Graphics")) cnt.textContent = stats.graphicCount;
+    else if (text.startsWith("Captions")) cnt.textContent = stats.captionCount;
+    else if (text.startsWith("Titles")) cnt.textContent = stats.titleCount;
+    else if (text.startsWith("Text Layers")) cnt.textContent = stats.textCount;
+    else if (text.startsWith("Markers")) cnt.textContent = stats.markerCount;
     else if (text.startsWith("Offline")) cnt.textContent = stats.offlineCount;
     else if (text.startsWith("Proxies")) cnt.textContent = stats.proxyCount;
     else if (text.startsWith("Effect Presets")) {
@@ -880,6 +890,16 @@ document.querySelectorAll(".nav-item").forEach(item => {
       queryInput.value = "nested:true";
     } else if (text.startsWith("Adjustment")) {
       queryInput.value = "adjustment:true";
+    } else if (text.startsWith("Essential Graphics")) {
+      queryInput.value = "graphic:true";
+    } else if (text.startsWith("Captions")) {
+      queryInput.value = "caption:true";
+    } else if (text.startsWith("Titles")) {
+      queryInput.value = "title:true";
+    } else if (text.startsWith("Text Layers")) {
+      queryInput.value = "textlayer:true";
+    } else if (text.startsWith("Markers")) {
+      queryInput.value = "hasmarkers:true";
     } else if (text.startsWith("Offline Media")) {
       queryInput.value = "offline:true";
     } else if (text.startsWith("Proxies")) {

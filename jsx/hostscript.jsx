@@ -54,10 +54,19 @@ function ffs_getProjectSnapshot() {
                     var volume = 0;
                     var position = "960, 540";
 
+                    var isGraphic = false;
+                    var isText = false;
                     try {
                         for (var k = 0; k < clip.components.numItems; k++) {
                             var comp = clip.components[k];
                             effects.push(comp.displayName);
+
+                            if (comp.displayName === "Graphic Parameters" || comp.displayName.indexOf("Essential Graphics") !== -1) {
+                                isGraphic = true;
+                            }
+                            if (comp.displayName.indexOf("Text") !== -1) {
+                                isText = true;
+                            }
 
                             // Extract motion/opacity/volume properties
                             if (comp.displayName === "Motion") {
@@ -152,6 +161,24 @@ function ffs_getProjectSnapshot() {
                         }
                     }
 
+                    var isTitle = false;
+                    var isCaption = false;
+                    var markerCount = 0;
+                    
+                    var mType = clip.mediaType ? clip.mediaType.toLowerCase() : "";
+                    var nLower2 = clip.name.toLowerCase();
+                    if (mType === "title" || nLower2.indexOf("title") !== -1 || (clip.projectItem && clip.projectItem.type === 4 && mediaPath === "")) {
+                        isTitle = true;
+                    }
+                    if (mType === "caption" || mType === "subtitle" || nLower2.indexOf("caption") !== -1) {
+                        isCaption = true;
+                    }
+                    try {
+                        if (clip.projectItem && clip.projectItem.getMarkers) {
+                            markerCount = clip.projectItem.getMarkers().numMarkers || 0;
+                        }
+                    } catch(e) {}
+
                     out.push({
                         id: _clipId(s, type, t, c),
                         sequenceIndex: s,
@@ -167,6 +194,11 @@ function ffs_getProjectSnapshot() {
                         effects: effects,
                         nested: isNested,
                         adjustment: isAdjustment,
+                        isGraphic: isGraphic,
+                        isText: isText,
+                        isTitle: isTitle,
+                        isCaption: isCaption,
+                        markerCount: markerCount,
                         mediaPath: mediaPath,
                         scale: scale,
                         opacity: opacity,
@@ -200,6 +232,11 @@ function ffs_getProjectSnapshot() {
             effects: [],
             nested: false,
             adjustment: false,
+            isGraphic: false,
+            isText: false,
+            isTitle: false,
+            isCaption: false,
+            markerCount: seq.markers ? seq.markers.numMarkers : 0,
             mediaPath: "",
             scale: 100,
             opacity: 100,

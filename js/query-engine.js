@@ -3,7 +3,8 @@
 const SUPPORTED_KEYS = new Set([
   "effect", "duration", "sequence", "nested", "adjustment", "text", "mediatype", "track",
   "camera", "fps", "label", "resolution", "codec", "offline", "proxy",
-  "volume", "opacity", "scale", "rotation", "name", "all"
+  "volume", "opacity", "scale", "rotation", "name", "all",
+  "graphic", "caption", "title", "textlayer", "hasmarkers"
 ]);
 
 const UNSUPPORTED_KEYS = new Set([
@@ -73,6 +74,21 @@ function runQuery(clips, raw) {
     } else if (t.key === "adjustment") {
       const want = needle === "true";
       matches = matches.filter(c => !!c.adjustment === want);
+    } else if (t.key === "graphic") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!c.isGraphic === want);
+    } else if (t.key === "caption") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!c.isCaption === want);
+    } else if (t.key === "title") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!c.isTitle === want);
+    } else if (t.key === "textlayer") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!c.isText === want);
+    } else if (t.key === "hasmarkers") {
+      const want = needle === "true";
+      matches = matches.filter(c => (c.markerCount > 0) === want);
     } else if (t.key === "text" || t.key === "contains" || t.key === "name") {
       matches = matches.filter(c => c.name.toLowerCase().includes(needle));
     } else if (t.key === "mediatype") {
