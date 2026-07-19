@@ -269,7 +269,6 @@ function runSearch(raw, opts = {}) {
           selectedIds.clear();
         }
         selectedIds.add(clip.id);
-        evalHost("ffs_selectProjectItems", JSON.stringify([clip.nodeId]));
         
         // Update local UI immediately so it feels instant
         updateInspector(clip);
@@ -339,9 +338,6 @@ function selectClip(clip, additive) {
   updateInspector(clip);
   runSearch(lastQuery, { rerenderOnly: true });
   window.ffsRerenderTimeline();
-
-  // Fire off ExtendScript selection in background without blocking the UI
-  evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
 }
 
 // Update the dynamic inspector panel
@@ -1163,9 +1159,21 @@ document.getElementById("batch-actions").addEventListener("click", async (e) => 
     selectedIds = new Set(currentMatches.map(c => c.id));
     await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
   } else if (action === "reveal-first") {
-    if (currentMatches[0]) {
+    if (selectedIds.size > 0) {
+      const arr = Array.from(selectedIds);
+      if (arr[0].startsWith("proj_")) {
+        const nodeIds = arr.map(id => id.replace("proj_", ""));
+        await evalHost("ffs_selectProjectItems", JSON.stringify(nodeIds));
+      } else {
+        await evalHost("ffs_selectClips", JSON.stringify(arr));
+      }
+    } else if (currentMatches[0]) {
       selectedIds = new Set([currentMatches[0].id]);
-      await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+      if (currentMatches[0].id.startsWith("proj_")) {
+        await evalHost("ffs_selectProjectItems", JSON.stringify([currentMatches[0].nodeId]));
+      } else {
+        await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+      }
     }
   } else if (action === "select-sequence") {
     const inSeq = currentMatches.filter(c => c.sequenceName === activeSequenceName);
