@@ -98,8 +98,18 @@ function translateAILanguage(input) {
   return lower; // fallback
 }
 let isPolling = false;
+let lastInteractionTime = 0;
+
+// Track user interactions to pause polling, keeping ExtendScript engine free for instant selection
+document.addEventListener("mousemove", () => { lastInteractionTime = Date.now(); });
+document.addEventListener("keydown", () => { lastInteractionTime = Date.now(); });
+document.addEventListener("click", () => { lastInteractionTime = Date.now(); });
+
 async function pollProject() {
   if (isPolling) return;
+  // If the user has interacted within the last 1500ms, skip polling
+  if (Date.now() - lastInteractionTime < 1500) return;
+  
   isPolling = true;
   try {
     const t0 = performance.now();
