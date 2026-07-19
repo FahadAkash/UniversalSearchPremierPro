@@ -6,7 +6,7 @@ const SUPPORTED_KEYS = new Set([
   "volume", "opacity", "scale", "rotation", "name", "all",
   "graphic", "caption", "title", "textlayer", "hasmarkers",
   "has_effects", "animpresets", "motionmodified", "haskeyframes",
-  "audioeffects", "lumetri", "hascolorlabel", "hasfonts"
+  "audioeffects", "lumetri", "hascolorlabel", "hasfonts", "asset"
 ]);
 
 const UNSUPPORTED_KEYS = new Set([
@@ -91,6 +91,20 @@ function runQuery(clips, raw) {
     } else if (t.key === "hasfonts") {
       const want = needle === "true";
       matches = matches.filter(c => !!(c.isText || c.isTitle) === want);
+    } else if (t.key === "asset") {
+      if (needle === "offline") matches = matches.filter(c => c.isOffline);
+      else if (needle === "proxy") matches = matches.filter(c => c.hasProxy);
+      else if (needle === "unused") matches = matches.filter(c => c.type === "File" && c.usage === 0);
+      else if (needle === "file") matches = matches.filter(c => c.type === "File");
+      else if (needle === "bin") matches = matches.filter(c => c.type === "Bin");
+      else if (needle === "missingfont") matches = []; // Hardcoded to none for now
+      else if (needle === "duplicate") {
+        const pathCounts = {};
+        matches.forEach(c => {
+          if (c.mediaPath) pathCounts[c.mediaPath] = (pathCounts[c.mediaPath] || 0) + 1;
+        });
+        matches = matches.filter(c => c.mediaPath && pathCounts[c.mediaPath] > 1);
+      }
     } else if (t.key === "nested") {
       const want = needle === "true";
       matches = matches.filter(c => !!c.nested === want);

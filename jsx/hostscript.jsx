@@ -23,11 +23,56 @@ function _getMetadataValue(meta, fieldName) {
     return "";
 }
 
+function _traverseProjectBin(item, outArray) {
+    if (!item) return;
+    try {
+        var isBin = (item.type === 2); // ProjectItemType.BIN
+        var usage = 0;
+        try {
+            if (item.videoUsage !== undefined) usage += item.videoUsage;
+            if (item.audioUsage !== undefined) usage += item.audioUsage;
+        } catch(e) {}
+        
+        var mediaPath = "";
+        try { if (item.getMediaPath) mediaPath = item.getMediaPath(); } catch(e) {}
+        
+        var isOffline = false;
+        try { if (item.isOffline) isOffline = item.isOffline(); } catch(e) {}
+        
+        var hasProxy = false;
+        try { if (item.hasProxy) hasProxy = item.hasProxy(); } catch(e) {}
+
+        outArray.push({
+            id: "proj_" + item.nodeId,
+            type: isBin ? "Bin" : "File",
+            name: item.name,
+            mediaPath: mediaPath,
+            isOffline: isOffline,
+            hasProxy: hasProxy,
+            usage: usage,
+            nodeId: item.nodeId
+        });
+        
+        if (isBin && item.children) {
+            for (var i = 0; i < item.children.numItems; i++) {
+                _traverseProjectBin(item.children[i], outArray);
+            }
+        }
+    } catch(e) {}
+}
+
 // Walks every sequence/track/clip in the open project and returns a flat
 // JSON array describing each clip, including applied effects and properties.
 function ffs_getProjectSnapshot() {
-    var out = [];
-    if (!app.project) return JSON.stringify(out);
+    var outSequenceClips = [];
+    var outProjectAssets = [];
+    if (!app.project) return JSON.stringify({ sequenceClips: outSequenceClips, projectAssets: outProjectAssets });
+    
+    try {
+        if (app.project.rootItem) {
+            _traverseProjectBin(app.project.rootItem, outProjectAssets);
+        }
+    } catch(e) {}
     
     var metadataCache = {};
 
@@ -191,7 +236,7 @@ function ffs_getProjectSnapshot() {
                         }
                     } catch(e) {}
 
-                    out.push({
+                    outSequenceClips.push({
                         id: _clipId(s, type, t, c),
                         sequenceIndex: s,
                         sequenceName: seqName,
@@ -233,7 +278,7 @@ function ffs_getProjectSnapshot() {
                     if (track.transitions) {
                         for (var tr = 0; tr < track.transitions.numItems; tr++) {
                             var trans = track.transitions[tr];
-                            out.push({
+                            outSequenceClips.push({
                                 id: _clipId(s, type, t, "TR_" + tr),
                                 sequenceIndex: s,
                                 sequenceName: seqName,
@@ -275,7 +320,7 @@ function ffs_getProjectSnapshot() {
         }
         
         // Add the sequence itself as a searchable item
-        out.push({
+        outSequenceClips.push({
             id: _clipId(s, "S", 0, 0),
             sequenceIndex: s,
             sequenceName: seqName,
@@ -312,7 +357,10 @@ function ffs_getProjectSnapshot() {
             hasLumetri: false
         });
     }
-    return JSON.stringify(out);
+    return JSON.stringify({
+        sequenceClips: outSequenceClips,
+        projectAssets: outProjectAssets
+    });
 }
 // Selects clips by ID and focuses them in timeline
 function ffs_selectClips(idsJson) {
@@ -353,6 +401,38 @@ function ffs_selectClips(idsJson) {
 
         if (toSelect.length > 0) {
             seq.setPlayerPosition(toSelect[0].start.ticks);
+        }
+        return JSON.stringify(true);
+    } catch (e) {
+        return JSON.stringify({ error: e.toString() });
+    }
+}
+
+function _findProjectItemByNodeId(item, nodeId) {
+    if (!item) return null;
+    if (item.nodeId === nodeId) return item;
+    if (item.children) {
+        for (var i = 0; i < item.children.numItems; i++) {
+            var res = _findProjectItemByNodeId(item.children[i], nodeId);
+            if (res) return res;
+        }
+    }
+    return null;
+}
+
+function ffs_selectProjectItems(nodeIdsJson) {
+    try {
+        var nodeIds = JSON.parse(nodeIdsJson);
+        if (!nodeIds.length) return JSON.stringify(false);
+        var toSelect = [];
+        for (var i = 0; i < nodeIds.length; i++) {
+            var item = _findProjectItemByNodeId(app.project.rootItem, nodeIds[i]);
+            if (item) toSelect.push(item);
+        }
+        for (var j = 0; j < toSelect.length; j++) {
+            if (typeof toSelect[j].select === "function") {
+                toSelect[j].select();
+            }
         }
         return JSON.stringify(true);
     } catch (e) {

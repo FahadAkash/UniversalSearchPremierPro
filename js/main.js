@@ -5,6 +5,7 @@ const csInterface = new CSInterface();
 const POLL_MS = 2000;
 
 let lastSnapshot = [];
+let lastProjectAssets = [];
 let lastQuery = "";
 let matchIds = new Set();
 let selectedIds = new Set();
@@ -113,7 +114,7 @@ async function pollProject() {
   isPolling = true;
   try {
     const t0 = performance.now();
-    const [snapshotJson, stateJson] = await Promise.all([
+    const [snapshotRes, stateJson] = await Promise.all([
       evalHost("ffs_getProjectSnapshot"),
       evalHost("ffs_getActiveState")
     ]);
@@ -157,7 +158,13 @@ async function pollProject() {
       indicator.style.opacity = "0.7";
     }
 
-    lastSnapshot = Array.isArray(snapshotJson) ? snapshotJson : [];
+    if (typeof snapshotRes === 'object' && snapshotRes !== null) {
+      lastSnapshot = snapshotRes.sequenceClips || [];
+      lastProjectAssets = snapshotRes.projectAssets || [];
+    } else {
+      lastSnapshot = [];
+      lastProjectAssets = [];
+    }
     
     // Hide scan bar if it's visible
     const scanBar = document.getElementById("scan-bar");
@@ -205,7 +212,10 @@ function runSearch(raw, opts = {}) {
   }
 
   const t0 = performance.now();
-  const { results, unsupported } = runQuery(lastSnapshot, searchVal);
+  
+  const isAssetQuery = searchVal.includes("asset:");
+  const searchTarget = isAssetQuery ? lastProjectAssets : lastSnapshot;
+  const { results, unsupported } = runQuery(searchTarget, searchVal);
   const queryMs = (performance.now() - t0).toFixed(1);
   matchIds = new Set(results.map(r => r.id));
 
@@ -227,54 +237,77 @@ function runSearch(raw, opts = {}) {
   resultsEl.innerHTML = "";
   results.forEach(clip => {
     const item = document.createElement("tr");
-    if (selectedIds.has(clip.id)) {
-      item.className = "selected match-glow";
+
+    if (isAssetQuery) {
+      // Render Project Asset Row
+      const isBin = clip.type === "Bin";
+      const icon = isBin 
+        ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2"/></svg>`
+        : `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>`;
+      
+      const usageTag = clip.usage === 0 && !isBin ? `<span class="fx-chip" style="color:var(--amber)">Unused</span>` : "";
+      const offlineTag = clip.isOffline ? `<span class="tag offline">● Offline</span>` : "";
+      const proxyTag = clip.hasProxy ? `<span class="tag proxy">◐ Proxy</span>` : "";
+      
+      item.innerHTML = `
+        <td><div class="cell-name"><span class="type-ico">${icon}</span>${escapeHtmlMain(clip.name)}</div></td>
+        <td>Project Bin</td>
+        <td class="mono">${clip.type}</td>
+        <td colspan="5" class="mono" style="opacity:0.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${clip.mediaPath || ""}">${clip.mediaPath || "—"}</td>
+        <td>${usageTag}</td>
+        <td>${offlineTag} ${proxyTag}</td>
+        <td colspan="2"></td>
+      `;
+      
+      item.addEventListener("click", () => {
+        evalHost("ffs_selectProjectItems", JSON.stringify([clip.nodeId]));
+      });
+      
     } else {
-      item.className = matchIds.has(clip.id) ? "match-glow" : "";
+      // Render Timeline Clip Row
+      const fxCount = clip.effects ? clip.effects.length : 0;
+      const hasWarp = clip.effects ? clip.effects.some(e => e.toLowerCase().includes("warp stabilizer")) : false;
+      const costClass = hasWarp ? "high" : (fxCount > 3 ? "high" : (fxCount > 1 ? "med" : "low"));
+      const costLabel = costClass === "high" ? "High" : (costClass === "med" ? "Med" : "Low");
+      const statusText = clip.offline ? `<span class="tag offline">● Offline</span>` : (clip.proxy ? `<span class="tag proxy">◐ Proxy</span>` : `<span class="tag online">● Online</span>`);
+      const labelColor = clip.colorLabel ? `style="background:${clip.colorLabel}"` : '';
+
+      // Timecode formatting
+      const tcMins = Math.floor(clip.start / 60);
+      const tcSecs = Math.floor(clip.start % 60);
+      const tcFrames = Math.round((clip.start % 1) * 24);
+      const timecode = `${tcMins.toString().padStart(2,'0')}:${tcSecs.toString().padStart(2,'0')}:${tcFrames.toString().padStart(2,'0')}`;
+
+      const typeClass = clip.trackType === "S" ? "adj" : (clip.trackType === "A" ? "audio" : ((clip.nested || clip.adjustment) ? "adj" : "video"));
+      const typeIco = clip.trackType === "S"
+        ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg>`
+        : (clip.trackType === "A"
+          ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`
+          : `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`);
+
+      const fxChips = clip.effects ? clip.effects.map(fx => `<span class="fx-chip">${fx}</span>`).join("") : "";
+
+      item.innerHTML = `
+        <td><div class="cell-name"><span class="type-ico ${typeClass}">${typeIco}</span>${escapeHtmlMain(clip.name)}</div></td>
+        <td>${escapeHtmlMain(clip.sequenceName)}</td>
+        <td class="mono">${clip.trackType === "S" ? "Seq" : clip.trackType + clip.trackIndex}</td>
+        <td class="mono">${clip.trackType === "S" ? "—" : timecode}</td>
+        <td class="mono">${clip.trackType === "S" ? "—" : clip.duration.toFixed(2) + "s"}</td>
+        <td>Scale</td><td class="mono">${clip.scale}%</td>
+        <td>${statusText}</td>
+        <td>${fxChips || '—'}</td>
+        <td><span class="cost ${costClass}"><i class="cost-dot"></i>${costLabel}</span></td>
+        <td><span class="lbl-dot" ${labelColor}></span></td>
+        <td class="mono">Now</td>
+      `;
+      item.addEventListener("click", (e) => {
+        const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+        selectClip(clip, additive);
+      });
+      item.addEventListener("mouseenter", () => { hoveredClipId = clip.id; window.ffsRerenderTimeline(); });
+      item.addEventListener("mouseleave", () => { hoveredClipId = null; window.ffsRerenderTimeline(); });
     }
 
-    const typeClass = clip.trackType === "S" ? "adj" : (clip.trackType === "A" ? "audio" : ((clip.nested || clip.adjustment) ? "adj" : "video"));
-    const typeIco = clip.trackType === "S"
-      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg>`
-      : (clip.trackType === "A"
-        ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`
-        : `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`);
-
-    const fxChips = clip.effects.map(fx => `<span class="fx-chip">${fx}</span>`).join("");
-    const statusText = clip.offline ? `<span class="tag offline">● Offline</span>` : (clip.proxy ? `<span class="tag proxy">◐ Proxy</span>` : `<span class="tag online">● Online</span>`);
-    const labelColor = clip.colorLabel ? `style="background:${clip.colorLabel}"` : '';
-
-    // Compute render cost
-    const fxCount = clip.effects.length;
-    const hasWarp = clip.effects.some(e => e.toLowerCase().includes("warp stabilizer"));
-    const costClass = hasWarp ? "high" : (fxCount > 3 ? "high" : (fxCount > 1 ? "med" : "low"));
-    const costLabel = costClass === "high" ? "High" : (costClass === "med" ? "Med" : "Low");
-
-    // Timecode formatting
-    const tcMins = Math.floor(clip.start / 60);
-    const tcSecs = Math.floor(clip.start % 60);
-    const tcFrames = Math.round((clip.start % 1) * 24);
-    const timecode = `${tcMins.toString().padStart(2,'0')}:${tcSecs.toString().padStart(2,'0')}:${tcFrames.toString().padStart(2,'0')}`;
-
-    item.innerHTML = `
-      <td><div class="cell-name"><span class="type-ico ${typeClass}">${typeIco}</span>${escapeHtmlMain(clip.name)}</div></td>
-      <td>${escapeHtmlMain(clip.sequenceName)}</td>
-      <td class="mono">${clip.trackType === "S" ? "Seq" : clip.trackType + clip.trackIndex}</td>
-      <td class="mono">${clip.trackType === "S" ? "—" : timecode}</td>
-      <td class="mono">${clip.trackType === "S" ? "—" : clip.duration.toFixed(2) + "s"}</td>
-      <td>Scale</td><td class="mono">${clip.scale}%</td>
-      <td>${statusText}</td>
-      <td>${fxChips || '—'}</td>
-      <td><span class="cost ${costClass}"><i class="cost-dot"></i>${costLabel}</span></td>
-      <td><span class="lbl-dot" ${labelColor}></span></td>
-      <td class="mono">Now</td>
-    `;
-    item.addEventListener("click", (e) => {
-      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
-      selectClip(clip, additive);
-    });
-    item.addEventListener("mouseenter", () => { hoveredClipId = clip.id; window.ffsRerenderTimeline(); });
-    item.addEventListener("mouseleave", () => { hoveredClipId = null; window.ffsRerenderTimeline(); });
     resultsEl.appendChild(item);
   });
 }
@@ -380,7 +413,25 @@ function updateAnalytics() {
     offlineCount: lastSnapshot.filter(c => c.offline).length,
     proxyCount: lastSnapshot.filter(c => c.proxy).length,
     noProxyCount: lastSnapshot.filter(c => !c.proxy && c.trackType === "V" && !c.nested).length,
+    
+    // Project Asset Stats
+    assetFiles: lastProjectAssets.filter(p => p.type === "File").length,
+    assetBins: lastProjectAssets.filter(p => p.type === "Bin").length,
+    assetOffline: lastProjectAssets.filter(p => p.isOffline).length,
+    assetUnused: lastProjectAssets.filter(p => p.type === "File" && p.usage === 0).length,
+    assetProxies: lastProjectAssets.filter(p => p.hasProxy).length,
+    assetDuplicates: 0 // Will compute below
   };
+
+  // Compute duplicate assets
+  const pathCounts = {};
+  for (let i = 0; i < lastProjectAssets.length; i++) {
+    const p = lastProjectAssets[i].mediaPath;
+    if (p) {
+      pathCounts[p] = (pathCounts[p] || 0) + 1;
+    }
+  }
+  stats.assetDuplicates = Object.values(pathCounts).filter(count => count > 1).reduce((a, b) => a + b, 0);
 
   // Wire up sidebar badges dynamically
   document.querySelectorAll(".nav-item").forEach(item => {
@@ -430,6 +481,25 @@ function updateAnalytics() {
     }
     else if (text.startsWith("Fonts")) cnt.textContent = stats.fonts;
     else if (text.startsWith("Colors")) cnt.textContent = stats.colors;
+    else if (text.startsWith("Project Files")) cnt.textContent = stats.assetFiles;
+    else if (text.startsWith("Folders") || text.startsWith("Bins")) cnt.textContent = stats.assetBins;
+    else if (text.startsWith("Unused Media")) cnt.textContent = stats.assetUnused;
+    else if (text.startsWith("Duplicate Assets")) cnt.textContent = stats.assetDuplicates;
+    else if (text.startsWith("Missing Fonts")) cnt.textContent = 0; // Hardcoded to 0 for now as per plan
+    
+    // Handle Offline/Proxies selectively if they are in the Assets group
+    else if (text.startsWith("Offline Media")) {
+      cnt.textContent = stats.assetOffline;
+    }
+    else if (text.startsWith("Offline")) cnt.textContent = stats.offlineCount;
+    else if (text.startsWith("Proxies") && item.closest('.sec-body')) {
+      // Check if it's the proxy under Assets or under timeline
+      if (item.parentNode.previousElementSibling && item.parentNode.previousElementSibling.textContent.includes('ASSETS')) {
+        cnt.textContent = stats.assetProxies;
+      } else {
+        cnt.textContent = stats.proxyCount;
+      }
+    }
   });
 }
 
@@ -926,11 +996,27 @@ document.querySelectorAll(".nav-item").forEach(item => {
     } else if (text.startsWith("Markers")) {
       queryInput.value = "hasmarkers:true";
     } else if (text.startsWith("Offline Media")) {
-      queryInput.value = "offline:true";
+      if (item.parentNode.previousElementSibling && item.parentNode.previousElementSibling.textContent.includes('ASSETS')) {
+        queryInput.value = "asset:offline";
+      } else {
+        queryInput.value = "offline:true";
+      }
     } else if (text.startsWith("Proxies")) {
-      queryInput.value = "proxy:true";
+      if (item.parentNode.previousElementSibling && item.parentNode.previousElementSibling.textContent.includes('ASSETS')) {
+        queryInput.value = "asset:proxy";
+      } else {
+        queryInput.value = "proxy:true";
+      }
     } else if (text.startsWith("Unused Media")) {
-      queryInput.value = "unused:true";
+      queryInput.value = "asset:unused";
+    } else if (text.startsWith("Project Files")) {
+      queryInput.value = "asset:file";
+    } else if (text.startsWith("Folders") || text.startsWith("Bins")) {
+      queryInput.value = "asset:bin";
+    } else if (text.startsWith("Duplicate Assets")) {
+      queryInput.value = "asset:duplicate";
+    } else if (text.startsWith("Missing Fonts")) {
+      queryInput.value = "asset:missingfont";
     } else if (text.startsWith("Markers")) {
       queryInput.value = "hasmarkers:true";
     } else if (text.startsWith("Effect Presets")) {
