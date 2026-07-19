@@ -105,9 +105,12 @@ function ffs_getProjectSnapshot() {
 
                     var isGraphic = false;
                     var isText = false;
-                    var keyframeCount = 0;
                     var hasLumetri = false;
+                    var effects = [];
                     var effectParams = {};
+                    var effectParamNames = {};
+                    var keyframeCount = 0;
+
                     try {
                         for (var k = 0; k < clip.components.numItems; k++) {
                             var comp = clip.components[k];
@@ -164,6 +167,7 @@ function ffs_getProjectSnapshot() {
                                             } else {
                                                 effectParams[key] = val;
                                             }
+                                            effectParamNames[key] = prop.displayName;
                                         }
                                         
                                         if (prop.isTimeVarying && prop.isTimeVarying()) {
@@ -273,6 +277,7 @@ function ffs_getProjectSnapshot() {
                         mediaType: clip.mediaType || (type === "V" ? "Video" : "Audio"),
                         effects: effects,
                         effectParams: effectParams,
+                        effectParamNames: effectParamNames,
                         nested: isNested,
                         adjustment: isAdjustment,
                         isGraphic: isGraphic,

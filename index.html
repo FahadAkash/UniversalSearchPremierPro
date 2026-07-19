@@ -59,8 +59,7 @@
   <div class="searchband">
     <div class="searchbar">
       <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input id="query" type="text" list="search-suggestions" class="query-display" placeholder="effect:&quot;Warp Stabilizer&quot;   volume>6   unused:true" style="background:transparent; border:none; color:var(--text-1); outline:none; font-family:var(--font-mono); font-size:13.5px;" autocomplete="off" spellcheck="false" />
-      <datalist id="search-suggestions"></datalist>
+      <input id="query" type="text" class="query-display" placeholder="effect:&quot;Warp Stabilizer&quot;   volume>6   unused:true" style="background:transparent; border:none; color:var(--text-1); outline:none; font-family:var(--font-mono); font-size:13.5px;" autocomplete="off" spellcheck="false" />
       <div class="searchbar-actions">
         <span class="kbd">⌘K</span>
         <button class="btn-ai-run">
@@ -69,6 +68,8 @@
         </button>
       </div>
     </div>
+    <!-- Custom Autocomplete Dropdown -->
+    <div id="suggestions-box" class="hidden"></div>
 
     <div class="chip-row">
       <span class="label" id="active-label" style="display:none;">Active</span>

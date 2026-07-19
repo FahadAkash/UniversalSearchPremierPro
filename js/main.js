@@ -951,34 +951,119 @@ function renderSavedSearches() {
   if (cnt) cnt.textContent = savedSearches.length;
 }
 
-// ===================== AUTOCOMPLETE SUGGESTIONS =====================
+let allSuggestions = [];
+
 function updateSuggestions() {
-  const dl = document.getElementById("search-suggestions");
-  if (!dl) return;
-  const paramKeys = new Set([
-    "effect:", "duration:", "sequence:", "nested:true", "adjustment:true", 
-    "text:", "mediatype:", "track:", "camera:", "fps:", "label:", "resolution:", 
-    "codec:", "offline:true", "proxy:true", "volume:", "opacity:", "scale:", 
-    "rotation:", "name:", "graphic:true", "hasmarkers:true", "has_effects:true", 
-    "animpresets:true", "motionmodified:true", "haskeyframes:true", 
-    "audioeffects:true", "lumetri:true", "hascolorlabel:true"
-  ]);
+  const coreOptions = [
+    { type: "core", query: "effect:", name: "Effect Name", icon: "✨" },
+    { type: "core", query: "duration:", name: "Duration", icon: "⏱" },
+    { type: "core", query: "sequence:", name: "Sequence Name", icon: "🎞" },
+    { type: "core", query: "offline:true", name: "Offline Media", icon: "⚠️" },
+    { type: "core", query: "volume:", name: "Volume (dB)", icon: "🔊" },
+    { type: "core", query: "opacity:", name: "Opacity (%)", icon: "👁" },
+    { type: "core", query: "scale:", name: "Scale (%)", icon: "📏" },
+    { type: "core", query: "rotation:", name: "Rotation (°)", icon: "🔄" },
+    { type: "core", query: "hasmarkers:true", name: "Has Markers", icon: "📍" },
+    { type: "core", query: "has_effects:true", name: "Has Effects", icon: "🎨" }
+  ];
   
+  const paramMap = new Map();
+  const effectMap = new Map();
+
   // Dynamically extract unique effect parameters across all clips
   lastSnapshot.forEach(c => {
-    if (c.effectParams) {
-      for (const k in c.effectParams) {
-        paramKeys.add(k + ":");
+    if (c.effectParamNames) {
+      for (const k in c.effectParamNames) {
+        paramMap.set(c.effectParamNames[k], k);
       }
     }
     if (c.effects) {
-      c.effects.forEach(fx => paramKeys.add('effect:"' + fx + '"'));
+      c.effects.forEach(fx => effectMap.set(fx, true));
     }
   });
 
-  const html = Array.from(paramKeys).map(k => `<option value="${escapeHtmlMain(k)}"></option>`).join("");
-  dl.innerHTML = html;
+  const paramOptions = Array.from(paramMap.entries()).map(([originalName, squashed]) => ({
+    type: "param",
+    query: originalName.toLowerCase() + ":",
+    name: originalName,
+    icon: "⚙️"
+  }));
+  
+  const effectOptions = Array.from(effectMap.keys()).map(fx => ({
+    type: "effect",
+    query: 'effect:"' + fx + '"',
+    name: fx,
+    icon: "✨"
+  }));
+
+  allSuggestions = [...coreOptions, ...paramOptions, ...effectOptions];
 }
+
+function renderCustomSuggestions(filterText = "") {
+  const box = document.getElementById("suggestions-box");
+  if (!box) return;
+  
+  if (filterText.trim() === "") {
+    box.classList.add("hidden");
+    return;
+  }
+  
+  const lowerFilter = filterText.toLowerCase().trim();
+  const filtered = allSuggestions.filter(s => 
+    s.name.toLowerCase().includes(lowerFilter) || 
+    s.query.toLowerCase().includes(lowerFilter)
+  ).slice(0, 50); // limit to 50
+  
+  if (filtered.length === 0) {
+    box.classList.add("hidden");
+    return;
+  }
+  
+  box.innerHTML = filtered.map(s => `
+    <div class="sugg-item" data-query="${escapeHtmlMain(s.query)}">
+      <span class="sugg-icon">${s.icon}</span>
+      <span class="sugg-match">${escapeHtmlMain(s.name)}</span>
+      <span style="opacity: 0.5; margin-left: auto; font-family: var(--font-mono);">${escapeHtmlMain(s.query)}</span>
+    </div>
+  `).join("");
+  
+  box.classList.remove("hidden");
+  
+  box.querySelectorAll(".sugg-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const q = el.dataset.query;
+      activeQueries.push(q);
+      document.getElementById("query").value = "";
+      box.classList.add("hidden");
+      renderActiveChips();
+      document.querySelector(".btn-ai-run").click();
+    });
+  });
+}
+
+// Hook up input events
+document.addEventListener("DOMContentLoaded", () => {
+  const qInput = document.getElementById("query");
+  if (qInput) {
+    qInput.addEventListener("input", (e) => {
+      renderCustomSuggestions(e.target.value);
+    });
+    qInput.addEventListener("focus", (e) => {
+      renderCustomSuggestions(e.target.value);
+    });
+    qInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        document.getElementById("suggestions-box").classList.add("hidden");
+      }
+    });
+    // Hide when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".searchband") && !e.target.closest("#suggestions-box")) {
+        document.getElementById("suggestions-box").classList.add("hidden");
+      }
+    });
+  }
+});
 
 // ===================== UTILITIES =====================
 function escapeHtmlMain(s) {
