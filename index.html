@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Universal Search — Premiere Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="white" stroke-width="2"/><path d="M20 20L15.2 15.2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <span class="brand-name">Universal Search</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="project-chip">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+      <b>Brand_Campaign_2026.prproj</b>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="stat-pill speed">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+      Search <b>11ms</b>
+    </div>
+    <div id="live-indicator" class="stat-pill">
+      <span class="dot"></span> Live Connected
+    </div>
+    <div class="ws-switch">
+      Editorial
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+
+    <div class="ai-toggle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.9L19 9.8l-4.9 1.9L12 17l-2.1-5.3L5 9.8l4.9-1.9L12 3z"/></svg>
+      AI Search
+      <div class="switch"></div>
+    </div>
+
+    <button id="help-toggle" class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span class="badge"></span></button>
+    <button class="icon-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.14.36.22.75.22 1.15V10.85c.36 0 .75.08 1.15.22"/></svg></button>
+    <div class="avatar">FA</div>
+  </header>
+
+  <!-- ===================== SEARCH BAND ===================== -->
+  <div class="searchband">
+    <div class="searchbar">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="query" type="text" class="query-display" placeholder="effect:&quot;Warp Stabilizer&quot;   volume>6   unused:true" style="background:transparent; border:none; color:var(--text-1); outline:none; font-family:var(--font-mono); font-size:13.5px;" autocomplete="off" spellcheck="false" />
+      <div class="searchbar-actions">
+        <span class="kbd">⌘K</span>
+        <button class="btn-ai-run">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Run
+        </button>
+      </div>
+    </div>
+
+    <div class="chip-row">
+      <span class="label">Active</span>
+      <span class="chip">effect:"Warp Stabilizer" <button>✕</button></span>
+      <span class="chip">volume&gt;6 <button>✕</button></span>
+      <span class="chip">unused:true <button>✕</button></span>
+      <span class="sep"></span>
+      <span class="label">Suggested</span>
+      <span class="chip ghost">+ opacity&lt;50</span>
+      <span class="chip ghost">+ fps:60</span>
+      <span class="chip ghost">+ rendercost:high</span>
+      <span class="chip ghost">+ label:red</span>
+      <span class="chip ghost">+ modified:today</span>
+    </div>
+  </div>
+
+  <!-- ===================== BODY ===================== -->
+  <div class="body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="nav-item active">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        All Results <span class="cnt">324</span>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          Clips
+        </div>
+        <div class="sec-body">
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg>Sequences<span class="cnt">6</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg>Nested Sequences<span class="cnt">9</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18" stroke-dasharray="2 2"/></svg>Adjustment Layers<span class="cnt">4</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Video Clips<span class="cnt">211</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Audio Clips<span class="cnt">64</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          Graphics
+        </div>
+        <div class="sec-body">
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l5-5 4 4 5-6 4 5"/></svg>Essential Graphics<span class="cnt">12</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l3-6 4 3 4-8 5 11H4z"/></svg>Captions<span class="cnt">3</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2M12 5v14M9 19h6"/></svg>Titles<span class="cnt">8</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Text Layers<span class="cnt">17</span></div>
+        </div>
+      </div>
+
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg>Markers<span class="cnt">41</span></div>
+
+      <div class="sec">
+        <div class="sec-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          Effects &amp; Motion
+        </div>
+        <div class="sec-body">
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Effect Presets<span class="cnt">28</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M4 12h16M20 4v16"/></svg>Transitions<span class="cnt">19</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>Animation Presets<span class="cnt">14</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12a7 7 0 1114 0 7 7 0 01-14 0z"/><path d="M12 8v4l2.5 2.5"/></svg>Motion Properties<span class="cnt">211</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="19" cy="16" r="2"/><path d="M7 12h3M14 8l3 6"/></svg>Keyframes<span class="cnt">1.2k</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10v4h4l5 5V5L7 10H3z"/><path d="M17 8a5 5 0 010 8"/></svg>Audio Effects<span class="cnt">36</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Lumetri<span class="cnt">52</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Color Labels<span class="cnt">7</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/></svg>Fonts<span class="cnt">11</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>Colors<span class="cnt">23</span></div>
+        </div>
+      </div>
+
+      <div class="sec collapsed">
+        <div class="sec-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          Assets
+        </div>
+        <div class="sec-body">
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M13 2v7h7"/></svg>Project Files<span class="cnt">890</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>Folders<span class="cnt">22</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2"/></svg>Bins<span class="cnt">15</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>Offline Media<span class="cnt" style="color:var(--red)">6</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Unused Media<span class="cnt">38</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="13" height="13" rx="2"/><rect x="8" y="8" width="13" height="13" rx="2"/></svg>Duplicate Assets<span class="cnt">14</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l5 5v13H6z"/><path d="M9 15l6-6M9 9l6 6"/></svg>Missing Fonts<span class="cnt" style="color:var(--amber)">2</span></div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="15" height="12" rx="2"/><path d="M18 10l4-2v8l-4-2"/></svg>Proxies<span class="cnt">176</span></div>
+        </div>
+      </div>
+
+      <div class="sec collapsed">
+        <div class="sec-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+          Metadata
+        </div>
+        <div class="sec-body">
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="M17 10l5-3v10l-5-3"/></svg>Camera Information</div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Resolution</div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Frame Rate</div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 9h16"/></svg>Codecs</div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/></svg>Aspect Ratio</div>
+          <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export Presets</div>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Recent Searches</div>
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg>Favorites</div>
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>Saved Queries<span class="cnt">6</span></div>
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12l8.73-5.04M12 22.08V12"/></svg>Smart Collections<span class="cnt">4</span></div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>Project Analytics</div>
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>Performance Scanner</div>
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Timeline Health<span class="cnt" style="color:var(--green)">92</span></div>
+      <div class="nav-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.14.36.22.75.22 1.15"/></svg>Settings</div>
+    </aside>
+
+    <!-- CENTER TABLE -->
+    <main class="center">
+      <div class="center-toolbar">
+        <div id="result-count" class="results-count">Type a query to search the open project...</div>
+        <div class="spacer"></div>
+        <div class="seg" id="view-seg">
+          <button class="active" data-view="table">Table</button>
+          <button data-view="layers">Layers</button>
+          <button data-view="analytics">Analytics</button>
+          <button data-view="scanner">Scanner</button>
+        </div>
+        <label class="auto-select-toggle" title="Auto-select matching clips on the timeline">
+          <input type="checkbox" id="auto-select-chk" checked />
+          <span class="auto-select-label">Auto-Select</span>
+        </label>
+      </div>
+
+      <!-- Loading / Scanning bar -->
+      <div id="scan-bar" class="scan-bar">
+        <div class="scan-bar-fill"></div>
+        <span class="scan-bar-text">Scanning project...</span>
+      </div>
+
+      <div class="table-scroll" id="table-view">
+        <table class="results">
+          <thead>
+            <tr>
+              <th>Name</th><th>Sequence</th><th>Track</th><th>Timecode</th><th>Duration</th>
+              <th>Property</th><th>Value</th><th>Status</th><th>Effects</th><th>Cost</th><th>Label</th><th>Modified</th>
+            </tr>
+          </thead>
+          <tbody id="results"></tbody>
+        </table>
+      </div>
+
+      <!-- Layer Overview -->
+      <div class="layer-overview hidden" id="layers-view">
+        <div id="layer-list" class="layer-list"></div>
+      </div>
+
+      <!-- Analytics Dashboard -->
+      <div class="analytics-dashboard hidden" id="analytics-view"></div>
+
+      <!-- Performance Scanner -->
+      <div class="scanner-dashboard hidden" id="scanner-view"></div>
+    </main>
+
+    <!-- INSPECTOR -->
+    <aside class="inspector" id="inspector-panel">
+      <div class="thumb" id="insp-thumb">
+        <span class="thumb-name" id="insp-thumb-name">Select a clip</span>
+        <div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+        <span class="thumb-tag" id="insp-thumb-tag">Click any row or sidebar item to inspect</span>
+      </div>
+
+      <div class="insp-tabs">
+        <button class="insp-tab active">Properties</button>
+        <button class="insp-tab">Usage</button>
+        <button class="insp-tab">Metadata</button>
+      </div>
+
+      <div class="insp-section" id="insp-motion">
+        <div class="insp-section-title">Motion</div>
+        <div class="prop-row"><span class="k">Position</span><span class="v">—</span></div>
+        <div class="prop-row withmeter"><span class="k">Scale</span><span class="v">—<span class="meter"><i style="width:0%"></i></span></span></div>
+        <div class="prop-row"><span class="k">Rotation</span><span class="v">—</span></div>
+        <div class="prop-row withmeter"><span class="k">Opacity</span><span class="v">—<span class="meter"><i style="width:0%"></i></span></span></div>
+      </div>
+
+      <div class="insp-section" id="insp-audio">
+        <div class="insp-section-title">Audio</div>
+        <div class="prop-row withmeter"><span class="k">Volume</span><span class="v">—<span class="meter"><i style="width:0%"></i></span></span></div>
+      </div>
+
+      <div class="insp-section" id="insp-effects">
+        <div class="insp-section-title">Effects</div>
+        <div class="prop-row"><span class="k" style="color:var(--text-3)">No clip selected</span></div>
+      </div>
+
+      <div class="insp-section" id="insp-usage">
+        <div class="insp-section-title">Usage</div>
+        <div class="prop-row"><span class="k" style="color:var(--text-3)">Select a clip to see usage</span></div>
+      </div>
+
+      <div class="insp-section-title" style="padding:13px 16px 0">Batch Actions</div>
+      <div id="batch-actions" class="batch-grid hidden">
+        <button class="batch-btn primary" data-action="select-all"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Select All Matches</button>
+        <button class="batch-btn" data-action="reveal-first"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 21l1-1 3-3M4 4l16 16M14 6H8a4 4 0 000 8h1"/></svg>Reveal in Timeline</button>
+        <button class="batch-btn" data-action="select-sequence"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg>Select in Current Seq</button>
+        <button class="batch-btn" data-action="select-project"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg>Select Project-wide</button>
+        <button class="batch-btn" data-action="export"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export CSV</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===================== TIMELINE ===================== -->
+  <div class="timeline">
+    <div class="tl-toolbar">
+      <div class="title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg>
+        Main_Edit_v12
+      </div>
+      <span class="meta">Synced live · 6 tracks · 5 matches highlighted</span>
+      <div class="spacer"></div>
+      <span class="meta mono">00:01:24:12 / 00:08:41:02</span>
+      <div class="zoom">
+        <svg id="zoom-out" style="cursor:pointer" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6"/></svg>
+        <div class="zoom-track"><i></i></div>
+        <svg id="zoom-in" style="cursor:pointer" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M8 11h6"/></svg>
+      </div>
+    </div>
+
+    <div class="tl-body">
+      <div id="tl-gutter" class="tl-gutter"></div>
+      <div id="timeline" class="tl-tracks"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Inspector tabs
+  document.querySelectorAll('.insp-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.insp-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+</script>
+
+<!-- ===================== COMMAND PALETTE ===================== -->
+<div id="command-palette" class="modal-overlay hidden">
+  <div class="modal-content">
+    <input type="text" id="cmd-input" placeholder="Type a command (Reveal, Proxy, Export, Toggle AI, Rename)..." autocomplete="off" />
+    <ul id="cmd-list"></ul>
+  </div>
+</div>
+
+<script src="js/CSInterface.js"></script>
+<script src="js/query-engine.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
