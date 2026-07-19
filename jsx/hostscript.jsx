@@ -122,26 +122,34 @@ function ffs_getProjectSnapshot() {
                         } catch (e) { }
                     }
 
-                    // Better nested sequence detection
                     var isNested = false;
+                    var isAdjustment = false;
                     var mediaPath = "";
                     if (clip.projectItem) {
                         try {
                             mediaPath = clip.projectItem.getMediaPath ? clip.projectItem.getMediaPath() : "";
-                            // A nested sequence has no media path and is on a video track
-                            if (mediaPath === "" && type === "V") {
-                                isNested = true;
-                            }
-                        } catch (e) {
-                            // If getMediaPath throws, it might be a sequence
-                            if (type === "V") isNested = true;
-                        }
-                        // Double-check: if the project item type indicates a sequence
+                        } catch(e) {}
+                        
                         try {
-                            if (clip.projectItem.type === 1 && mediaPath === "") {
-                                isNested = true;
+                            if (typeof clip.projectItem.isSequence === "function") {
+                                isNested = clip.projectItem.isSequence();
+                            } else {
+                                if (mediaPath === "" && type === "V") {
+                                    isNested = (clip.name.toLowerCase().indexOf("adjustment") === -1);
+                                }
                             }
                         } catch(e) {}
+
+                        if (mediaPath === "" && !isNested && type === "V") {
+                            var nLower = clip.name.toLowerCase();
+                            var pLower = clip.projectItem.name ? clip.projectItem.name.toLowerCase() : "";
+                            if (nLower.indexOf("adjustment") !== -1 || pLower.indexOf("adjustment") !== -1) {
+                                isAdjustment = true;
+                            } else if (clip.effects.length > 0 && nLower.indexOf("transparent") === -1 && nLower.indexOf("black video") === -1 && nLower.indexOf("color matte") === -1) {
+                                // sometimes adjustment layers are renamed. If they have effects, no media path, aren't sequences, etc...
+                                // We'll just rely on the name containing 'adjustment' to be safe, but fallback is ok
+                            }
+                        }
                     }
 
                     out.push({
@@ -158,6 +166,7 @@ function ffs_getProjectSnapshot() {
                         mediaType: clip.mediaType || (type === "V" ? "Video" : "Audio"),
                         effects: effects,
                         nested: isNested,
+                        adjustment: isAdjustment,
                         mediaPath: mediaPath,
                         scale: scale,
                         opacity: opacity,
@@ -169,12 +178,42 @@ function ffs_getProjectSnapshot() {
                         fps: fps,
                         resolution: resolution,
                         codec: codec,
-                        proxy: proxy,
                         colorLabel: colorLabel
                     });
                 }
             }
         }
+        
+        // Add the sequence itself as a searchable item
+        out.push({
+            id: _clipId(s, "S", 0, 0),
+            sequenceIndex: s,
+            sequenceName: seqName,
+            trackType: "S",
+            trackIndex: 0,
+            clipIndex: 0,
+            name: seqName,
+            start: 0,
+            end: 0,
+            duration: 0,
+            mediaType: "Sequence",
+            effects: [],
+            nested: false,
+            adjustment: false,
+            mediaPath: "",
+            scale: 100,
+            opacity: 100,
+            rotation: 0,
+            volume: 0,
+            position: "0, 0",
+            offline: false,
+            camera: "",
+            fps: "",
+            resolution: "",
+            codec: "",
+            proxy: false,
+            colorLabel: ""
+        });
     }
     return JSON.stringify(out);
 }
@@ -198,17 +237,27 @@ function ffs_selectClips(idsJson) {
         var toSelect = [];
         for (var i = 0; i < ids.length; i++) {
             var p = _parseId(ids[i]);
+            if (p.trackType === "S") {
+                app.project.activeSequence = app.project.sequences[p.seqIndex];
+                continue;
+            }
             var trackList = (p.trackType === "V") ? seq.videoTracks : seq.audioTracks;
             var track = trackList[p.trackIndex];
             var clip = track.clips[p.clipIndex];
             toSelect.push(clip);
         }
 
-        for (var j = 0; j < toSelect.length; j++) {
-            toSelect[j].setSelected(true, j === 0);
+        if (typeof seq.setSelection === "function") {
+            seq.setSelection(toSelect);
+        } else {
+            for (var j = 0; j < toSelect.length; j++) {
+                toSelect[j].setSelected(true, j === 0);
+            }
         }
 
-        seq.setPlayerPosition(toSelect[0].start.ticks);
+        if (toSelect.length > 0) {
+            seq.setPlayerPosition(toSelect[0].start.ticks);
+        }
         return JSON.stringify(true);
     } catch (e) {
         return JSON.stringify({ error: e.toString() });
@@ -216,7 +265,7 @@ function ffs_selectClips(idsJson) {
 }
 
 function _parseId(id) {
-    var m = id.match(/^seq(\d+)_([VA])(\d+)_c(\d+)$/);
+    var m = id.match(/^seq(\d+)_([VAS])(\d+)_c(\d+)$/);
     return {
         seqIndex: parseInt(m[1], 10),
         trackType: m[2],

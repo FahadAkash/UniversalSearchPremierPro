@@ -50,7 +50,7 @@ function renderTimeline(clips, activeSequenceName, matchIds, selectedIds, playhe
 
     seqClips.filter(c => (c.trackType + c.trackIndex) === tk).forEach(c => {
       const block = document.createElement("div");
-      block.className = "clip-block " + (c.trackType === "A" ? "a" : (c.nested ? "adj" : "v"));
+      block.className = "clip-block " + (c.trackType === "A" ? "a" : ((c.nested || c.adjustment) ? "adj" : "v"));
       if (matchIds.has(c.id)) block.classList.add("match");
       if (selectedIds.has(c.id)) block.classList.add("selected");
       if (hoveredClipId === c.id) block.classList.add("hovered");

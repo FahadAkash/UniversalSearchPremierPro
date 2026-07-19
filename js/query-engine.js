@@ -1,7 +1,7 @@
 // Universal Search — query language engine
 
 const SUPPORTED_KEYS = new Set([
-  "effect", "duration", "sequence", "nested", "text", "mediatype", "track",
+  "effect", "duration", "sequence", "nested", "adjustment", "text", "mediatype", "track",
   "camera", "fps", "label", "resolution", "codec", "offline", "proxy",
   "volume", "opacity", "scale", "rotation", "name", "all"
 ]);
@@ -70,6 +70,9 @@ function runQuery(clips, raw) {
     } else if (t.key === "nested") {
       const want = needle === "true";
       matches = matches.filter(c => !!c.nested === want);
+    } else if (t.key === "adjustment") {
+      const want = needle === "true";
+      matches = matches.filter(c => !!c.adjustment === want);
     } else if (t.key === "text" || t.key === "contains" || t.key === "name") {
       matches = matches.filter(c => c.name.toLowerCase().includes(needle));
     } else if (t.key === "mediatype") {
@@ -79,7 +82,7 @@ function runQuery(clips, raw) {
       } else if (needle === "audio" || needle === "a") {
         matches = matches.filter(c => c.trackType === "A");
       } else if (needle === "sequence") {
-        matches = matches.filter(c => c.nested);
+        matches = matches.filter(c => c.trackType === "S");
       } else {
         matches = matches.filter(c => c.trackType && c.trackType.toLowerCase() === needle);
       }

@@ -2,7 +2,7 @@
 // Polls the ExtendScript host for the current project state.
 
 const csInterface = new CSInterface();
-const POLL_MS = 700;
+const POLL_MS = 2000;
 
 let lastSnapshot = [];
 let lastQuery = "";
@@ -211,7 +211,7 @@ function runSearch(raw, opts = {}) {
   // Auto-select matching clips in the timeline (debounced)
   if (autoSelectEnabled && !opts.rerenderOnly && results.length > 0) {
     clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(() => autoSelectMatches(results), 300);
+    searchDebounceTimer = setTimeout(() => autoSelectMatches(results), 50);
   }
 
   resultsEl.innerHTML = "";
@@ -223,10 +223,12 @@ function runSearch(raw, opts = {}) {
       item.className = matchIds.has(clip.id) ? "match-glow" : "";
     }
 
-    const typeClass = clip.trackType === "A" ? "audio" : (clip.nested ? "adj" : "video");
-    const typeIco = clip.trackType === "A"
-      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`
-      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+    const typeClass = clip.trackType === "S" ? "adj" : (clip.trackType === "A" ? "audio" : ((clip.nested || clip.adjustment) ? "adj" : "video"));
+    const typeIco = clip.trackType === "S"
+      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 6v12M17 6v12"/></svg>`
+      : (clip.trackType === "A"
+        ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`
+        : `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`);
 
     const fxChips = clip.effects.map(fx => `<span class="fx-chip">${fx}</span>`).join("");
     const statusText = clip.offline ? `<span class="tag offline">● Offline</span>` : (clip.proxy ? `<span class="tag proxy">◐ Proxy</span>` : `<span class="tag online">● Online</span>`);
@@ -247,9 +249,9 @@ function runSearch(raw, opts = {}) {
     item.innerHTML = `
       <td><div class="cell-name"><span class="type-ico ${typeClass}">${typeIco}</span>${escapeHtmlMain(clip.name)}</div></td>
       <td>${escapeHtmlMain(clip.sequenceName)}</td>
-      <td class="mono">${clip.trackType}${clip.trackIndex}</td>
-      <td class="mono">${timecode}</td>
-      <td class="mono">${clip.duration.toFixed(2)}s</td>
+      <td class="mono">${clip.trackType === "S" ? "Seq" : clip.trackType + clip.trackIndex}</td>
+      <td class="mono">${clip.trackType === "S" ? "—" : timecode}</td>
+      <td class="mono">${clip.trackType === "S" ? "—" : clip.duration.toFixed(2) + "s"}</td>
       <td>Scale</td><td class="mono">${clip.scale}%</td>
       <td>${statusText}</td>
       <td>${fxChips || '—'}</td>
@@ -344,8 +346,9 @@ function updateAnalytics() {
     totalClips: lastSnapshot.length,
     videoClips: lastSnapshot.filter(c => c.trackType === "V").length,
     audioClips: lastSnapshot.filter(c => c.trackType === "A").length,
-    sequences: [...new Set(lastSnapshot.map(c => c.sequenceName))].length,
+    sequences: lastSnapshot.filter(c => c.trackType === "S").length,
     nestedCount: lastSnapshot.filter(c => c.nested).length,
+    adjustmentCount: lastSnapshot.filter(c => c.adjustment).length,
     effectsCount: lastSnapshot.reduce((acc, c) => acc + c.effects.length, 0),
     offlineCount: lastSnapshot.filter(c => c.offline).length,
     proxyCount: lastSnapshot.filter(c => c.proxy).length,
@@ -362,6 +365,7 @@ function updateAnalytics() {
     else if (text.startsWith("Audio Clips")) cnt.textContent = stats.audioClips;
     else if (text.startsWith("Sequences")) cnt.textContent = stats.sequences;
     else if (text.startsWith("Nested")) cnt.textContent = stats.nestedCount;
+    else if (text.startsWith("Adjustment")) cnt.textContent = stats.adjustmentCount;
     else if (text.startsWith("Offline")) cnt.textContent = stats.offlineCount;
     else if (text.startsWith("Proxies")) cnt.textContent = stats.proxyCount;
     else if (text.startsWith("Effect Presets")) {
@@ -861,7 +865,7 @@ document.querySelectorAll(".nav-item").forEach(item => {
     } else if (text.startsWith("Nested")) {
       queryInput.value = "nested:true";
     } else if (text.startsWith("Adjustment")) {
-      queryInput.value = "nested:true";
+      queryInput.value = "adjustment:true";
     } else if (text.startsWith("Offline Media")) {
       queryInput.value = "offline:true";
     } else if (text.startsWith("Proxies")) {
