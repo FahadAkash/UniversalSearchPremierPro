@@ -1525,8 +1525,13 @@ function openBatchEditModal(clips) {
     editor.style.display = "";
 
     const valArr = Array.from(selectedProp.values);
-    const currentVal = valArr.length === 1 ? valArr[0] : "";
-    const mixedHint = valArr.length > 1 ? ` (mixed: ${valArr.join(", ")})` : "";
+    let valStr = "";
+    if (valArr.length === 1) valStr = valArr[0];
+    else if (valArr.length > 1) {
+      if (selectedProp.type === "text" && valArr.some(v => v.includes(","))) valStr = "Mixed";
+      else valStr = valArr.join(", ");
+    }
+    const mixedHint = valArr.length > 1 ? ` (mixed: ${valStr})` : "";
 
     if (selectedProp.type === "boolean") {
       const isTrueNow = valArr.some(v => v.toLowerCase() === "true" || v === "1");

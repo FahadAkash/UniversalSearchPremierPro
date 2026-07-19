@@ -176,7 +176,18 @@ function ffs_getProjectSnapshot() {
                                             if (typeof val === 'object' && val.length !== undefined) {
                                                 // It's an array
                                                 var arr = [];
-                                                for(var x=0; x<val.length; x++) arr.push(Math.round(val[x]*100)/100);
+                                                if (val.length === 2 && val[0] >= -10 && val[0] <= 10 && val[1] >= -10 && val[1] <= 10) {
+                                                    var w = 1920, h = 1080;
+                                                    try {
+                                                        var settings = seq.getSettings();
+                                                        w = settings.videoFrameWidth;
+                                                        h = settings.videoFrameHeight;
+                                                    } catch(e) {}
+                                                    arr.push(Math.round(val[0] * w * 10) / 10);
+                                                    arr.push(Math.round(val[1] * h * 10) / 10);
+                                                } else {
+                                                    for(var x=0; x<val.length; x++) arr.push(Math.round(val[x]*100)/100);
+                                                }
                                                 effectParams[key] = arr.join(", ");
                                             } else {
                                                 effectParams[key] = val;
@@ -741,15 +752,42 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
                                 if (isString && typeof newValue === 'string') {
                                     var parts = newValue.split(',');
                                     var arr = [];
+                                    var isNormalized = (originalVal.length === 2 && originalVal[0] >= -10 && originalVal[0] <= 10 && originalVal[1] >= -10 && originalVal[1] <= 10);
+                                    var w = 1920, h = 1080;
+                                    if (isNormalized) {
+                                        try {
+                                            var settings = seq.getSettings();
+                                            w = settings.videoFrameWidth;
+                                            h = settings.videoFrameHeight;
+                                        } catch(e) {}
+                                    }
+                                    
                                     for (var j = 0; j < parts.length; j++) {
-                                        arr.push(parseFloat(parts[j]));
+                                        var pNum = parseFloat(parts[j]);
+                                        if (isNormalized && j === 0) pNum = pNum / w;
+                                        if (isNormalized && j === 1) pNum = pNum / h;
+                                        arr.push(pNum);
                                     }
                                     targetVal = arr;
                                 } else {
                                     // if they just sent a number but it expects an array (e.g. they typed "100" instead of "100, 100")
                                     var num = parseFloat(newValue);
                                     var arr = [];
-                                    for (var j = 0; j < originalVal.length; j++) arr.push(num);
+                                    for (var j = 0; j < originalVal.length; j++) {
+                                        var pNum = num;
+                                        var isNormalized = (originalVal.length === 2 && originalVal[0] >= -10 && originalVal[0] <= 10 && originalVal[1] >= -10 && originalVal[1] <= 10);
+                                        if (isNormalized) {
+                                            var w = 1920, h = 1080;
+                                            try {
+                                                var settings = seq.getSettings();
+                                                w = settings.videoFrameWidth;
+                                                h = settings.videoFrameHeight;
+                                            } catch(e) {}
+                                            if (j === 0) pNum = pNum / w;
+                                            if (j === 1) pNum = pNum / h;
+                                        }
+                                        arr.push(pNum);
+                                    }
                                     targetVal = arr;
                                 }
                             } else {
