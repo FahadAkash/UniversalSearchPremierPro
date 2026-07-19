@@ -154,7 +154,19 @@ function ffs_getProjectSnapshot() {
                                 try {
                                     var prop = comp.properties[p];
                                     if (prop.displayName) {
-                                        var key = prop.displayName.toLowerCase().replace(/\s+/g, "");
+                                        var rawKey = prop.displayName.toLowerCase().replace(/\s+/g, "");
+                                        var key = rawKey;
+                                        var finalDisplayName = prop.displayName;
+                                        
+                                        // If this key already exists for this clip, disambiguate using internal name
+                                        if (effectParams[key] !== undefined) {
+                                            var internalName = prop.name || String(p);
+                                            // Clean up internal name for UI if possible (e.g. ADBE Levels-0002 -> Levels-0002)
+                                            internalName = internalName.replace(/^ADBE\s*/, "");
+                                            finalDisplayName = prop.displayName + " (" + internalName + ")";
+                                            key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
+                                        }
+
                                         var val = prop.getValue();
                                         
                                         // Stringify arrays (like position) or objects so they can be JSON serialized without huge nesting
@@ -167,7 +179,7 @@ function ffs_getProjectSnapshot() {
                                             } else {
                                                 effectParams[key] = val;
                                             }
-                                            effectParamNames[key] = prop.displayName;
+                                            effectParamNames[key] = finalDisplayName;
                                         }
                                         
                                         if (prop.isTimeVarying && prop.isTimeVarying()) {
@@ -696,10 +708,23 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
 
             for (var k = 0; k < clip.components.numItems; k++) {
                 var comp = clip.components[k];
+                var localNames = {}; // Track names to match exact disambiguation logic
+                
                 for (var pr = 0; pr < comp.properties.numItems; pr++) {
                     var prop = comp.properties[pr];
                     if (prop.displayName) {
-                        var key = prop.displayName.toLowerCase().replace(/\s+/g, "");
+                        var rawKey = prop.displayName.toLowerCase().replace(/\s+/g, "");
+                        var key = rawKey;
+                        
+                        if (localNames[key] !== undefined) {
+                            var internalName = prop.name || String(pr);
+                            internalName = internalName.replace(/^ADBE\s*/, "");
+                            var finalDisplayName = prop.displayName + " (" + internalName + ")";
+                            key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
+                        } else {
+                            localNames[key] = true;
+                        }
+                        
                         if (key === squashedPropertyName) {
                             prop.setValue(targetVal, 1);
                             count++;
