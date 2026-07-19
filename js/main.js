@@ -1039,6 +1039,26 @@ document.querySelectorAll(".nav-item").forEach(item => {
       queryInput.value = "hasfonts:true";
     } else if (text.startsWith("Colors")) {
       queryInput.value = "graphic:true";
+    } else if (text.startsWith("Camera Information")) {
+      queryInput.value = "hascamera:true";
+    } else if (text.startsWith("Resolution")) {
+      queryInput.value = "hasresolution:true";
+    } else if (text.startsWith("Frame Rate")) {
+      queryInput.value = "hasfps:true";
+    } else if (text.startsWith("Codecs")) {
+      queryInput.value = "hascodec:true";
+    } else if (text.startsWith("Aspect Ratio")) {
+      queryInput.value = "aspectratio:true";
+    } else if (text.startsWith("Export Presets")) {
+      queryInput.value = "exportpreset:true";
+    } else if (text.startsWith("Recent Searches")) {
+      // Just clear search or show command palette
+      showCommandPalette();
+      return;
+    } else if (text.startsWith("Favorites")) {
+      queryInput.value = "favorite:true";
+    } else if (text.startsWith("Smart Collections")) {
+      queryInput.value = "collection:true";
     } else if (text.startsWith("Project Analytics")) {
       switchView("analytics");
       return;

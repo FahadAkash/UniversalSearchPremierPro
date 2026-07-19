@@ -6,7 +6,8 @@ const SUPPORTED_KEYS = new Set([
   "volume", "opacity", "scale", "rotation", "name", "all",
   "graphic", "caption", "title", "textlayer", "hasmarkers",
   "has_effects", "animpresets", "motionmodified", "haskeyframes",
-  "audioeffects", "lumetri", "hascolorlabel", "hasfonts", "asset"
+  "audioeffects", "lumetri", "hascolorlabel", "hasfonts", "asset",
+  "hascamera", "hasresolution", "hasfps", "hascodec", "favorite", "exportpreset", "aspectratio"
 ]);
 
 const UNSUPPORTED_KEYS = new Set([
@@ -88,6 +89,21 @@ function runQuery(clips, raw) {
     } else if (t.key === "hascolorlabel") {
       const want = needle === "true";
       matches = matches.filter(c => (c.colorLabel && c.colorLabel !== "0") === want);
+    } else if (t.key === "hascamera") {
+      matches = matches.filter(c => !!c.camera === (needle === "true"));
+    } else if (t.key === "hasresolution") {
+      matches = matches.filter(c => !!c.resolution === (needle === "true"));
+    } else if (t.key === "hasfps") {
+      matches = matches.filter(c => !!c.fps === (needle === "true"));
+    } else if (t.key === "hascodec") {
+      matches = matches.filter(c => !!c.codec === (needle === "true"));
+    } else if (t.key === "favorite") {
+      // Favorites not implemented on backend yet, return empty for now
+      matches = [];
+    } else if (t.key === "aspectratio" || t.key === "exportpreset") {
+      // Aspect Ratio and Export Presets are unsupported
+      unsupported.push(t.key);
+      return;
     } else if (t.key === "hasfonts") {
       const want = needle === "true";
       matches = matches.filter(c => !!(c.isText || c.isTitle) === want);
