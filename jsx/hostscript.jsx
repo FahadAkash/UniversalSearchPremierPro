@@ -107,6 +107,7 @@ function ffs_getProjectSnapshot() {
                     var isText = false;
                     var keyframeCount = 0;
                     var hasLumetri = false;
+                    var effectParams = {};
                     try {
                         for (var k = 0; k < clip.components.numItems; k++) {
                             var comp = clip.components[k];
@@ -145,11 +146,29 @@ function ffs_getProjectSnapshot() {
                                 }
                             }
                             
-                            // Check for keyframes on properties
+                            // Extract all properties dynamically for arbitrary search
                             for (var p = 0; p < comp.properties.numItems; p++) {
                                 try {
-                                    if (comp.properties[p].isTimeVarying && comp.properties[p].isTimeVarying()) {
-                                        keyframeCount += comp.properties[p].getKeys ? comp.properties[p].getKeys().length : 1;
+                                    var prop = comp.properties[p];
+                                    if (prop.displayName) {
+                                        var key = prop.displayName.toLowerCase().replace(/\s+/g, "");
+                                        var val = prop.getValue();
+                                        
+                                        // Stringify arrays (like position) or objects so they can be JSON serialized without huge nesting
+                                        if (val !== undefined && val !== null) {
+                                            if (typeof val === 'object' && val.length !== undefined) {
+                                                // It's an array
+                                                var arr = [];
+                                                for(var x=0; x<val.length; x++) arr.push(Math.round(val[x]*100)/100);
+                                                effectParams[key] = arr.join(", ");
+                                            } else {
+                                                effectParams[key] = val;
+                                            }
+                                        }
+                                        
+                                        if (prop.isTimeVarying && prop.isTimeVarying()) {
+                                            keyframeCount += prop.getKeys ? prop.getKeys().length : 1;
+                                        }
                                     }
                                 } catch(e) {}
                             }
@@ -253,6 +272,7 @@ function ffs_getProjectSnapshot() {
                         duration: (clip.end && clip.start) ? (clip.end.seconds - clip.start.seconds) : 0,
                         mediaType: clip.mediaType || (type === "V" ? "Video" : "Audio"),
                         effects: effects,
+                        effectParams: effectParams,
                         nested: isNested,
                         adjustment: isAdjustment,
                         isGraphic: isGraphic,

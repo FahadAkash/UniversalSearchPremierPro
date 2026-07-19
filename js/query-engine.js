@@ -54,13 +54,31 @@ function runQuery(clips, raw) {
     }
 
     if (!SUPPORTED_KEYS.has(t.key)) {
-      // Treat unknown keys as generic name text searches
-      const needle = t.value.toLowerCase();
-      matches = matches.filter(c => c.name.toLowerCase().includes(needle));
+      const needle = String(t.value).toLowerCase();
+      const op = t.op === ":" ? "=" : t.op;
+      
+      matches = matches.filter(c => {
+        if (c.effectParams && c.effectParams[t.key] !== undefined) {
+          const val = c.effectParams[t.key];
+          if (needle === "off" || needle === "false") {
+            return val === false || val === 0 || val === "0" || val === "false";
+          }
+          if (needle === "on" || needle === "true") {
+            return val === true || val === 1 || val === "1" || val === "true";
+          }
+          const parsed = parseFloat(needle);
+          if (!isNaN(parsed) && typeof val === "number") {
+            return compare(val, op, parsed);
+          }
+          return compare(String(val).toLowerCase(), op, needle);
+        }
+        // Fallback to name search
+        return c.name && c.name.toLowerCase().includes(needle);
+      });
       return;
     }
 
-    const needle = t.value.toLowerCase();
+    const needle = String(t.value).toLowerCase();
 
     if (t.key === "effect") {
       matches = matches.filter(c => c.effects.some(e => e.toLowerCase().includes(needle)));

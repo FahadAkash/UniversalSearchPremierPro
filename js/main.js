@@ -382,8 +382,16 @@ function updateInspector(clip) {
     if (clip.effects && clip.effects.length > 0) {
       clip.effects.forEach(fx => {
         const isHeavy = fx.toLowerCase().includes("warp") || fx.toLowerCase().includes("lumetri");
-        effectsHtml += `<div class="prop-row"><span class="k">● ${escapeHtmlMain(fx)}</span><span class="v" style="color:${isHeavy ? 'var(--red)' : 'var(--text-2)'}">${isHeavy ? 'Heavy' : 'Light'}</span></div>`;
+        effectsHtml += `<div class="prop-row" style="margin-top:8px"><span class="k">● <b style="color:var(--text-1)">${escapeHtmlMain(fx)}</b></span><span class="v" style="color:${isHeavy ? 'var(--red)' : 'var(--text-2)'}">${isHeavy ? 'Heavy' : 'Light'}</span></div>`;
       });
+      // Also list effect parameters
+      if (clip.effectParams) {
+         for (let key in clip.effectParams) {
+           let val = clip.effectParams[key];
+           if (typeof val === "boolean") val = val ? "On" : "Off";
+           effectsHtml += `<div class="prop-row"><span class="k" style="padding-left:16px; font-size:11px; color:var(--text-3)">${escapeHtmlMain(key)}</span><span class="v" style="font-size:11px">${escapeHtmlMain(String(val))}</span></div>`;
+         }
+      }
     } else {
       effectsHtml += '<div class="prop-row"><span class="k" style="color:var(--text-3)">No effects applied</span></div>';
     }
