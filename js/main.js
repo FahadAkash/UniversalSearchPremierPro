@@ -240,6 +240,11 @@ function runSearch(raw, opts = {}) {
 
     if (isAssetQuery) {
       // Render Project Asset Row
+      if (selectedIds.has(clip.id)) {
+        item.className = "selected match-glow";
+      } else {
+        item.className = matchIds.has(clip.id) ? "match-glow" : "";
+      }
       const isBin = clip.type === "Bin";
       const icon = isBin 
         ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2"/></svg>`
@@ -259,12 +264,26 @@ function runSearch(raw, opts = {}) {
         <td colspan="2"></td>
       `;
       
-      item.addEventListener("click", () => {
+      item.addEventListener("click", (e) => {
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+          selectedIds.clear();
+        }
+        selectedIds.add(clip.id);
         evalHost("ffs_selectProjectItems", JSON.stringify([clip.nodeId]));
+        
+        // Update local UI immediately so it feels instant
+        updateInspector(clip);
+        runSearch(lastQuery, { rerenderOnly: true });
+        window.ffsRerenderTimeline();
       });
       
     } else {
       // Render Timeline Clip Row
+      if (selectedIds.has(clip.id)) {
+        item.className = "selected match-glow";
+      } else {
+        item.className = matchIds.has(clip.id) ? "match-glow" : "";
+      }
       const fxCount = clip.effects ? clip.effects.length : 0;
       const hasWarp = clip.effects ? clip.effects.some(e => e.toLowerCase().includes("warp stabilizer")) : false;
       const costClass = hasWarp ? "high" : (fxCount > 3 ? "high" : (fxCount > 1 ? "med" : "low"));
