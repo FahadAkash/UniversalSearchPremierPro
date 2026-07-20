@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionManifest Version="8.0" ExtensionBundleId="com.universalsearch"
-    ExtensionBundleVersion="1.0.0"
+    ExtensionBundleVersion="1.1.0"
     ExtensionBundleName="Universal Search"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <ExtensionList>
-    <Extension Id="com.universalsearch.panel" Version="1.0.0" />
+    <Extension Id="com.universalsearch.panel" Version="1.1.0" />
   </ExtensionList>
 
   <ExecutionEnvironment>

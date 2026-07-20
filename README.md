@@ -74,3 +74,29 @@ you'd like to check that first (plain text, no obfuscation).
 - `js/timeline.js` — mini timeline renderer
 - `js/main.js` — polling loop, search UI, batch actions
 - `index.html` / `css/style.css` — panel UI
+
+## Premiere Pro API Capabilities & Limitations (The "Black Box")
+
+Universal Search uses Adobe's ExtendScript API to scan your timeline. While it is incredibly powerful, Adobe places strict limitations on what parameters are actually exposed to scripts. 
+
+### ✅ Fully Supported (Scannable)
+These effects and properties expose their internal parameters to the ExtendScript API. You can search them using their exact names or properties (e.g., effect:"Lumetri Color", opacity<50, olume:5).
+
+| Category | Examples / Properties |
+| --- | --- |
+| **Standard Video Effects** | Lumetri Color, Gaussian Blur, Transform, Crop, Ultra Key, Tint, Drop Shadow |
+| **Motion Properties** | Position, Scale, Rotation, Anchor Point, Anti-flicker Filter |
+| **Opacity Properties** | Opacity, Blend Mode |
+| **Standard Audio Effects** | Volume (Mute, Level), Channel Volume |
+| **Third-Party Video Plugins** | Boris FX (Sapphire/Continuum), Red Giant Universe, Video Copilot (usually hook into the standard API) |
+| **Clip Metadata** | Name, MediaType, Duration, Track, Sequence, Framerate, Codec, Label, Offline Status, Timecode |
+
+### ❌ Unsupported (The API "Black Box")
+These components are treated as encapsulated "Black Boxes" by Premiere Pro. They use custom internal architectures and literally expose **zero parameters** to the ExtendScript API. Because the parameters are invisible to scripts, Universal Search cannot see or query them.
+
+| Category | Examples / Properties | Reason for Limitation |
+| --- | --- | --- |
+| **Advanced Audio / VSTs** | Parametric Equalizer, Graphic Equalizer, Dynamics, Reverb, Chorus, Mastering | Encapsulated in the "Custom Setup" UI; no properties are mapped to the script API. |
+| **Intrinsic Audio Routing** | Panner (Balance) | Treated as an intrinsic track/clip routing feature, omitted from the clip.components list in ExtendScript. |
+| **Third-Party Audio VSTs** | iZotope, Waves, FabFilter, etc. | Identical to advanced native audio effects; completely hidden from scripting. |
+| **Internal Text/Caption Engines** | Essential Graphics Text Content, SRT Captions | While the layer exists, reading the actual string of text typed inside the caption block is often blocked or heavily restricted by the API depending on the Premiere version. |

@@ -74,17 +74,48 @@ function runQuery(clips, raw) {
           keyToUse = "uniformscale";
         }
         
-        if (c.effectParams && c.effectParams[keyToUse] !== undefined) {
-          const val = c.effectParams[keyToUse];
+        let val = undefined;
+        if (c.effectParams) {
+          let foundKey = undefined;
+          
+          // 1. If there's an active effect search, prioritize keys belonging to that effect!
+          const activeEffects = tokens.filter(tok => tok.key === "effect").map(tok => tok.value.toLowerCase().replace(/[^a-z0-9]/g, ""));
+          if (activeEffects.length > 0) {
+            const keys = Object.keys(c.effectParams);
+            const matchesKey = keys.filter(k => k.indexOf(keyToUse) !== -1);
+            foundKey = matchesKey.find(k => activeEffects.some(fx => k.indexOf(fx) !== -1));
+          }
+          
+          // 2. If not found via active effect, try exact match
+          if (foundKey === undefined && c.effectParams[keyToUse] !== undefined) {
+            foundKey = keyToUse;
+          }
+          
+          // 3. Fallback for disambiguated keys if exact match doesn't exist
+          if (foundKey === undefined) {
+            const keys = Object.keys(c.effectParams);
+            const matchesKey = keys.filter(k => k.indexOf(keyToUse) !== -1);
+            if (matchesKey.length > 0) {
+              foundKey = matchesKey[0];
+            }
+          }
+          
+          if (foundKey !== undefined) {
+            val = c.effectParams[foundKey];
+          }
+        }
+
+        if (val !== undefined) {
           if (needle === "off" || needle === "false") {
             return val === false || val === 0 || val === "0" || val === "false";
           }
           if (needle === "on" || needle === "true") {
             return val === true || val === 1 || val === "1" || val === "true";
           }
-          const parsed = parseFloat(needle);
-          if (!isNaN(parsed) && typeof val === "number") {
-            return compare(val, op, parsed);
+          const parsedVal = parseFloat(val);
+          const parsedNeedle = parseFloat(needle);
+          if (!isNaN(parsedVal) && !isNaN(parsedNeedle)) {
+            return compare(parsedVal, op, parsedNeedle);
           }
           return compare(String(val).toLowerCase(), op, needle);
         }

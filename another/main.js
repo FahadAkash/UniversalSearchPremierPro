@@ -12,7 +12,7 @@ let selectedIds = new Set();
 let activeSequenceName = null;
 let playheadSeconds = 0;
 let aiSearchEnabled = false;
-let autoSelectEnabled = false;
+let autoSelectEnabled = true;
 let searchDebounceTimer = null;
 let lastLayerData = null;
 let knownEffects = [];
@@ -20,16 +20,9 @@ let currentView = 'table';
 let projectStats = null;
 let projectName = "Loading...";
 let savedSearches = [];
-let lastSelectedNodeId = null;
 
 // Load saved searches from localStorage
 try { savedSearches = JSON.parse(localStorage.getItem("ffs_savedSearches") || "[]"); } catch(e) {}
-
-// Load cached project data from localStorage to show immediately
-try { 
-  lastSnapshot = JSON.parse(localStorage.getItem("ffs_cachedSnapshot") || "[]"); 
-  lastProjectAssets = JSON.parse(localStorage.getItem("ffs_cachedAssets") || "[]");
-} catch(e) {}
 
 // Command Palette commands list
 const COMMANDS = [
@@ -119,20 +112,21 @@ async function pollProject(force = false) {
     if (force) pollQueued = true;
     return;
   }
-  
-  // Show scan bar on forced scans
-  if (force) {
-    const scanBar = document.getElementById("scan-bar");
-    if (scanBar) scanBar.classList.remove("hidden");
-  }
   // If the user has interacted within the last 1500ms, skip polling
   if (!force && Date.now() - lastInteractionTime < 1500) return;
   
   isPolling = true;
   try {
     const t0 = performance.now();
-    // Fetch instant state first
+
+    // Fetch the cheap state (playhead / active sequence / connection) first
+    // and apply it immediately. Previously this was bundled into the same
+    // Promise.all as the full project scan below — since ExtendScript only
+    // ever runs one script at a time, that meant this tiny call sat in the
+    // queue behind the slow scan on every single cycle, so the live
+    // playhead readout lagged along with it for no reason.
     const stateJson = await evalHost("ffs_getActiveState");
+
     const indicator = document.getElementById("live-indicator");
     const state = stateJson;
     if (state && state.connected) {
@@ -162,23 +156,18 @@ async function pollProject(force = false) {
         }).length;
         tlMeta.textContent = `Synced live · ${trackCount} tracks · ${matchCount} matches highlighted`;
       }
-      
-      // Auto-Reveal Bin Selection logic
-      const chkAutoReveal = document.getElementById("chk-auto-reveal");
-      if (chkAutoReveal && chkAutoReveal.checked && state.selectedNodeId) {
-        if (state.selectedNodeId !== lastSelectedNodeId) {
-          lastSelectedNodeId = state.selectedNodeId;
-          evalHost("ffs_revealProjectItemInTimeline", state.selectedNodeId);
-        }
-      } else if (!state.selectedNodeId) {
-        lastSelectedNodeId = null;
-      }
     } else {
       indicator.innerHTML = '<span class="dot" style="background:var(--red); box-shadow:none;"></span> Disconnected';
       indicator.style.opacity = "0.7";
     }
 
-    // Now do the heavy snapshot fetch
+    // Reflect the fresh playhead position right away, before waiting on
+    // the heavier scan below.
+    window.ffsRerenderTimeline();
+
+    // Now run the full project scan (every clip/effect/property). This is
+    // the expensive call — everything above already reflects the latest
+    // state without having waited on it.
     const snapshotRes = await evalHost("ffs_getProjectSnapshot");
     const searchTime = (performance.now() - t0).toFixed(0);
 
@@ -189,11 +178,6 @@ async function pollProject(force = false) {
     if (typeof snapshotRes === 'object' && snapshotRes !== null) {
       lastSnapshot = snapshotRes.sequenceClips || [];
       lastProjectAssets = snapshotRes.projectAssets || [];
-      // Cache data for instant loading next time
-      try {
-        localStorage.setItem("ffs_cachedSnapshot", JSON.stringify(lastSnapshot));
-        localStorage.setItem("ffs_cachedAssets", JSON.stringify(lastProjectAssets));
-      } catch(e) {}
     } else {
       lastSnapshot = [];
       lastProjectAssets = [];
@@ -275,7 +259,6 @@ function runSearch(raw, opts = {}) {
   resultsEl.innerHTML = "";
   results.forEach(clip => {
     const item = document.createElement("tr");
-    item.dataset.clipId = clip.id;
 
     if (isAssetQuery) {
       // Render Project Asset Row
@@ -311,13 +294,11 @@ function runSearch(raw, opts = {}) {
         
         // Update local UI immediately so it feels instant
         updateInspector(clip);
-        if (window.fastUpdateHighlight) {
-          window.fastUpdateHighlight();
-          window.pulseTimelineClip(clip.id);
-        } else {
-          runSearch(lastQuery, { rerenderOnly: true });
-          window.ffsRerenderTimeline();
-        }
+        runSearch(lastQuery, { rerenderOnly: true });
+        window.ffsRerenderTimeline();
+
+        // Select this item in Premiere's Project panel too (previously missing).
+        syncSelectionToPremiere();
       });
       
     } else {
@@ -366,14 +347,8 @@ function runSearch(raw, opts = {}) {
         const additive = e.shiftKey || e.ctrlKey || e.metaKey;
         selectClip(clip, additive);
       });
-      item.addEventListener("mouseenter", () => { 
-        hoveredClipId = clip.id; 
-        if(window.fastUpdateHighlight) window.fastUpdateHighlight(); else window.ffsRerenderTimeline(); 
-      });
-      item.addEventListener("mouseleave", () => { 
-        hoveredClipId = null; 
-        if(window.fastUpdateHighlight) window.fastUpdateHighlight(); else window.ffsRerenderTimeline(); 
-      });
+      item.addEventListener("mouseenter", () => { hoveredClipId = clip.id; window.ffsRerenderTimeline(); });
+      item.addEventListener("mouseleave", () => { hoveredClipId = null; window.ffsRerenderTimeline(); });
     }
 
     resultsEl.appendChild(item);
@@ -386,24 +361,29 @@ function selectClip(clip, additive) {
   
   // Update local UI immediately so it feels instant
   updateInspector(clip);
+  runSearch(lastQuery, { rerenderOnly: true });
+  window.ffsRerenderTimeline();
+
+  // Push the same selection into Premiere itself. This was the actual bug:
+  // a click only ever updated the panel's own highlight and never told
+  // Premiere to select the clip or move its playhead, so on a plain click
+  // nothing happened on the Premiere side no matter how long you waited —
+  // it wasn't a queueing delay, the command was simply never sent.
   syncSelectionToPremiere();
-  
-  if (window.fastUpdateHighlight) {
-    window.fastUpdateHighlight();
-    window.pulseTimelineClip(clip.id);
-  } else {
-    runSearch(lastQuery, { rerenderOnly: true });
-    window.ffsRerenderTimeline();
-  }
 }
 
+// Mirrors the panel's current selectedIds into Premiere. Splits by id type
+// since project-bin items (ffs_selectProjectItems) and sequence/timeline
+// clips (ffs_selectClips) go through different host calls. Fire-and-forget:
+// the panel's own UI already updated above, so we don't block on this.
 function syncSelectionToPremiere() {
   const ids = Array.from(selectedIds);
   const projIds = ids.filter(id => id.startsWith("proj_"));
   const clipIds = ids.filter(id => !id.startsWith("proj_"));
 
   if (projIds.length) {
-    evalHost("ffs_selectProjectItems", JSON.stringify(projIds.map(id => id.replace("proj_", ""))));
+    const nodeIds = projIds.map(id => id.replace("proj_", ""));
+    evalHost("ffs_selectProjectItems", JSON.stringify(nodeIds));
   }
   if (clipIds.length) {
     evalHost("ffs_selectClips", JSON.stringify(clipIds));
@@ -668,8 +648,7 @@ async function executeCommand(cmd) {
     if (currentMatches[0]) selectClip(currentMatches[0], false);
   } else if (cmd.action === "toggle-ai") {
     aiSearchEnabled = !aiSearchEnabled;
-    const aiEl = document.querySelector(".ai-toggle");
-    if (aiEl) aiEl.classList.toggle("active", aiSearchEnabled);
+    document.querySelector(".ai-toggle").classList.toggle("active", aiSearchEnabled);
     runSearch(lastQuery);
   } else if (cmd.action === "export") {
     exportCSV(currentMatches);
@@ -842,85 +821,50 @@ async function renderAnalyticsDashboard() {
   const container = document.getElementById("analytics-view");
   if (!container) return;
 
-  // If we have no snapshot data yet, try a fresh poll first
-  if (lastSnapshot.length === 0 && lastProjectAssets.length === 0) {
-    container.innerHTML = '<div class="analytics-loading">Analyzing project...</div>';
-    await pollProject(true);
+  container.innerHTML = '<div class="analytics-loading">Analyzing project...</div>';
+
+  const stats = await evalHost("ffs_getProjectStats");
+  if (!stats || stats.error) {
+    container.innerHTML = '<div class="layer-empty">Could not load project stats.</div>';
+    return;
   }
-
-  // Compute stats from local data — no extra ExtendScript call needed
-  const seqNames = new Set();
-  let totalVideoClips = 0;
-  let totalAudioClips = 0;
-  let totalEffects = 0;
-  let totalMarkers = 0;
-  let offlineCount = 0;
-  const effectUsage = {};
-
-  for (let i = 0; i < lastSnapshot.length; i++) {
-    const c = lastSnapshot[i];
-    if (c.sequenceName) seqNames.add(c.sequenceName);
-    if (c.trackType === "V") totalVideoClips++;
-    else if (c.trackType === "A") totalAudioClips++;
-    if (c.offline) offlineCount++;
-    if (c.markerCount) totalMarkers += c.markerCount;
-    if (c.effects && c.effects.length > 0) {
-      for (let j = 0; j < c.effects.length; j++) {
-        const fx = c.effects[j];
-        totalEffects++;
-        effectUsage[fx] = (effectUsage[fx] || 0) + 1;
-      }
-    }
-  }
-
-  // Project-level stats from lastProjectAssets
-  const totalProjectItems = lastProjectAssets.length;
-  let totalBins = 0;
-  let projectOffline = 0;
-  for (let i = 0; i < lastProjectAssets.length; i++) {
-    if (lastProjectAssets[i].type === "Bin") totalBins++;
-    if (lastProjectAssets[i].isOffline) projectOffline++;
-  }
-
-  const sequenceCount = seqNames.size;
-  const finalOffline = offlineCount + projectOffline;
 
   // Sort effects by usage
-  const effectEntries = Object.entries(effectUsage).sort((a, b) => b[1] - a[1]);
+  const effectEntries = Object.entries(stats.effectUsage || {}).sort((a, b) => b[1] - a[1]);
   const topEffects = effectEntries.slice(0, 12);
 
   container.innerHTML = `
     <div class="analytics-grid">
       <div class="analytics-card">
-        <div class="analytics-card-value">${sequenceCount}</div>
+        <div class="analytics-card-value">${stats.sequenceCount}</div>
         <div class="analytics-card-label">Sequences</div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-value">${totalVideoClips}</div>
+        <div class="analytics-card-value">${stats.totalVideoClips}</div>
         <div class="analytics-card-label">Video Clips</div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-value">${totalAudioClips}</div>
+        <div class="analytics-card-value">${stats.totalAudioClips}</div>
         <div class="analytics-card-label">Audio Clips</div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-value">${totalEffects}</div>
+        <div class="analytics-card-value">${stats.totalEffects}</div>
         <div class="analytics-card-label">Effects Applied</div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-value">${totalMarkers}</div>
+        <div class="analytics-card-value">${stats.totalMarkers}</div>
         <div class="analytics-card-label">Markers</div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-value">${totalProjectItems}</div>
+        <div class="analytics-card-value">${stats.totalProjectItems}</div>
         <div class="analytics-card-label">Project Items</div>
       </div>
-      <div class="analytics-card ${finalOffline > 0 ? 'danger' : ''}">
-        <div class="analytics-card-value">${finalOffline}</div>
+      <div class="analytics-card ${stats.offlineCount > 0 ? 'danger' : ''}">
+        <div class="analytics-card-value">${stats.offlineCount}</div>
         <div class="analytics-card-label">Offline Media</div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-value">${totalBins}</div>
+        <div class="analytics-card-value">${stats.totalBins}</div>
         <div class="analytics-card-label">Bins / Folders</div>
       </div>
     </div>
@@ -928,8 +872,8 @@ async function renderAnalyticsDashboard() {
     <div class="analytics-section">
       <div class="analytics-section-title">Most Used Effects</div>
       <div class="analytics-effects-list">
-        ${topEffects.length === 0 ? '<div style="color:var(--text-3); padding: 8px 0;">No effects found in project.</div>' : topEffects.map(([name, count]) => {
-          const pct = Math.round((count / Math.max(totalEffects, 1)) * 100);
+        ${topEffects.map(([name, count]) => {
+          const pct = Math.round((count / Math.max(stats.totalEffects, 1)) * 100);
           return `
             <div class="analytics-effect-row" data-effect="${escapeHtmlMain(name)}">
               <span class="analytics-effect-name">${escapeHtmlMain(name)}</span>
@@ -1057,7 +1001,6 @@ function renderSavedSearches() {
 }
 
 let allSuggestions = [];
-let effectToParams = new Map(); // Maps effectDisplayName -> Set of parameter names
 
 function updateSuggestions() {
   const coreOptions = [
@@ -1075,27 +1018,10 @@ function updateSuggestions() {
   
   const paramMap = new Map();
   const effectMap = new Map();
-  effectToParams = new Map();
 
   // Dynamically extract unique effect parameters across all clips
   lastSnapshot.forEach(c => {
-    if (c.effectParamGroups && c.effectParamNames) {
-      for (const effectName in c.effectParamGroups) {
-        if (!effectToParams.has(effectName)) {
-          effectToParams.set(effectName, new Set());
-        }
-        const paramSet = effectToParams.get(effectName);
-        const keys = c.effectParamGroups[effectName];
-        keys.forEach(k => {
-          const originalName = c.effectParamNames[k];
-          if (originalName) {
-            paramSet.add(originalName);
-            paramMap.set(originalName, k);
-          }
-        });
-      }
-    } else if (c.effectParamNames) {
-      // Fallback if groups are missing
+    if (c.effectParamNames) {
       for (const k in c.effectParamNames) {
         paramMap.set(c.effectParamNames[k], k);
       }
@@ -1113,13 +1039,14 @@ function updateSuggestions() {
   }));
   
   // Pre-seed the system with common built-in Premiere Pro effects
+  // so that "intelligence" always works even if the effect isn't applied yet.
   const COMMON_EFFECTS = [
     "Lumetri Color", "Transform", "Crop", "Gaussian Blur", "Warp Stabilizer",
     "Ultra Key", "ProcAmp", "Levels", "Color Key", "Basic 3D", "Drop Shadow",
     "Directional Blur", "Noise", "Mosaic", "Luma Key", "Track Matte Key",
     "Timecode", "Tint", "Leave Color", "Extract", "Find Edges", "Black & White",
     "Color Balance (RGB)", "Video Limiter", "Morph Cut", "Cross Dissolve",
-    "Dip to Black", "Dip to White", "Film Dissolve", "Parametric Equalizer"
+    "Dip to Black", "Dip to White", "Film Dissolve"
   ];
   
   COMMON_EFFECTS.forEach(fx => {
@@ -1145,76 +1072,16 @@ function renderCustomSuggestions(filterText = "") {
   const box = document.getElementById("suggestions-box");
   if (!box) return;
   
+  if (filterText.trim() === "") {
+    box.classList.add("hidden");
+    return;
+  }
+  
   const lowerFilter = filterText.toLowerCase().trim();
-
-  // Find active effects in the current search chips
-  let activeEffects = [];
-  activeQueries.forEach(q => {
-    const m = q.match(/effect:"([^"]+)"/i);
-    if (m) activeEffects.push(m[1]);
-  });
-
-  // Also check if they are currently typing an effect query in the search field
-  const typingEffectMatch = filterText.match(/effect:"([^"]*)"?$/i);
-  if (typingEffectMatch && typingEffectMatch[1]) {
-    activeEffects.push(typingEffectMatch[1]);
-  }
-
-  let contextualSuggestions = [];
-
-  // Extract parameters for active/typed effects
-  if (activeEffects.length > 0) {
-    activeEffects.forEach(activeFx => {
-      for (const [fxName, paramSet] of effectToParams.entries()) {
-        if (fxName.toLowerCase().indexOf(activeFx.toLowerCase()) !== -1) {
-          paramSet.forEach(paramName => {
-            contextualSuggestions.push({
-              type: "context-param",
-              query: paramName.toLowerCase().replace(/\s+/g, "") + ":",
-              name: `${paramName} (${fxName})`,
-              icon: "⚙️"
-            });
-          });
-        }
-      }
-    });
-  }
-
-  let candidates = [];
-  if (contextualSuggestions.length > 0) {
-    if (lowerFilter === "") {
-      candidates = contextualSuggestions;
-    } else {
-      candidates = contextualSuggestions.filter(s =>
-        s.name.toLowerCase().includes(lowerFilter) ||
-        s.query.toLowerCase().includes(lowerFilter)
-      );
-    }
-  }
-
-  // Fallback to general suggestions
-  if (candidates.length < 15) {
-    const generalFiltered = allSuggestions.filter(s => {
-      // Avoid duplicate parameter suggestions if they are already in the contextual list
-      if (s.type === "param" && contextualSuggestions.some(cs => cs.query === s.query)) {
-        return false;
-      }
-      if (lowerFilter === "") return s.type === "core" || s.type === "effect";
-      return s.name.toLowerCase().includes(lowerFilter) || s.query.toLowerCase().includes(lowerFilter);
-    });
-
-    candidates = [...candidates, ...generalFiltered];
-  }
-
-  // Remove duplicates based on query string
-  const seenQueries = new Set();
-  candidates = candidates.filter(s => {
-    if (seenQueries.has(s.query)) return false;
-    seenQueries.add(s.query);
-    return true;
-  });
-
-  const filtered = candidates.slice(0, 50);
+  const filtered = allSuggestions.filter(s => 
+    s.name.toLowerCase().includes(lowerFilter) || 
+    s.query.toLowerCase().includes(lowerFilter)
+  ).slice(0, 50); // limit to 50
   
   if (filtered.length === 0) {
     box.classList.add("hidden");
@@ -1225,7 +1092,7 @@ function renderCustomSuggestions(filterText = "") {
     <div class="sugg-item" data-query="${escapeHtmlMain(s.query)}">
       <span class="sugg-icon">${s.icon}</span>
       <span class="sugg-match">${escapeHtmlMain(s.name)}</span>
-      <span style="opacity: 0.5; margin-left: auto; font-family: var(--font-mono); font-size: 10px;">${escapeHtmlMain(s.query)}</span>
+      <span style="opacity: 0.5; margin-left: auto; font-family: var(--font-mono);">${escapeHtmlMain(s.query)}</span>
     </div>
   `).join("");
   
@@ -1234,21 +1101,11 @@ function renderCustomSuggestions(filterText = "") {
   box.querySelectorAll(".sugg-item").forEach(el => {
     el.addEventListener("click", () => {
       const q = el.dataset.query;
-      const qInput = document.getElementById("query");
-      if (q.endsWith(":")) {
-        // If it's a parameter template (e.g. lowshelffrequency:), populate input and focus to let them complete it (e.g. < 0.6)
-        qInput.value = q;
-        qInput.focus();
-        // Hide suggestions so they can see the input field clearly
-        box.classList.add("hidden");
-      } else {
-        // If it's a complete query (e.g. effect:"Drop Shadow"), add it as a chip immediately
-        activeQueries.push(q);
-        qInput.value = "";
-        box.classList.add("hidden");
-        renderActiveChips();
-        document.querySelector(".btn-ai-run").click();
-      }
+      activeQueries.push(q);
+      document.getElementById("query").value = "";
+      box.classList.add("hidden");
+      renderActiveChips();
+      document.querySelector(".btn-ai-run").click();
     });
   });
 }
@@ -1262,9 +1119,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     qInput.addEventListener("focus", (e) => {
       pollProject(true); // Force an instant poll to get newly added effects
-      renderCustomSuggestions(e.target.value);
-    });
-    qInput.addEventListener("click", (e) => {
       renderCustomSuggestions(e.target.value);
     });
     qInput.addEventListener("keydown", (e) => {
@@ -1460,14 +1314,11 @@ document.querySelectorAll(".nav-item").forEach(item => {
 });
 
 // AI Toggle click
-const aiToggleEl = document.querySelector(".ai-toggle");
-if (aiToggleEl) {
-  aiToggleEl.addEventListener("click", () => {
-    aiSearchEnabled = !aiSearchEnabled;
-    aiToggleEl.classList.toggle("active", aiSearchEnabled);
-    runSearch(document.getElementById("query").value);
-  });
-}
+document.querySelector(".ai-toggle").addEventListener("click", () => {
+  aiSearchEnabled = !aiSearchEnabled;
+  document.querySelector(".ai-toggle").classList.toggle("active", aiSearchEnabled);
+  runSearch(document.getElementById("query").value);
+});
 
 // Auto-select toggle
 document.getElementById("auto-select-chk").addEventListener("change", (e) => {
@@ -1481,21 +1332,6 @@ document.getElementById("query").addEventListener("keydown", (e) => {
     document.querySelector(".btn-ai-run").click();
   }
 });
-
-// Rescan button
-const btnRescan = document.getElementById("btn-rescan");
-if (btnRescan) {
-  btnRescan.addEventListener("click", async () => {
-    btnRescan.innerHTML = `<span class="spinner" style="width:12px;height:12px"></span> Scanning...`;
-    btnRescan.style.pointerEvents = "none";
-    await pollProject(true);
-    // Refresh current view if needed
-    const activeView = document.querySelector("#view-seg .active");
-    if (activeView) switchView(activeView.dataset.view || 'table');
-    btnRescan.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Scan Again`;
-    btnRescan.style.pointerEvents = "auto";
-  });
-}
 
 // View switching via seg buttons
 document.querySelectorAll('#view-seg button').forEach(btn => {
@@ -1564,325 +1400,6 @@ if (btnRun) {
   });
 }
 
-// ============ BATCH EDIT INTERACTIVE MODAL ============
-function openBatchEditModal(clips) {
-  // 1. Scan all matched clips to build an effect → property → values map
-  // Uses effectParamGroups from ExtendScript which maps effectDisplayName → [squashedKey1, ...]
-  const effectTree = new Map(); // effectName → Map(propDisplayName → { squashed, values: Set, type })
-  
-  clips.forEach(clip => {
-    if (!clip.effectParams || !clip.effectParamNames) return;
-    
-    // Use effectParamGroups if available (maps componentDisplayName → [squashedKeys])
-    const groups = clip.effectParamGroups || {};
-    
-    for (const effectName in groups) {
-      const keys = groups[effectName];
-      if (!keys || !keys.length) continue;
-      
-      if (!effectTree.has(effectName)) {
-        effectTree.set(effectName, new Map());
-      }
-      const propMap = effectTree.get(effectName);
-      
-      for (var ki = 0; ki < keys.length; ki++) {
-        const squashed = keys[ki];
-        const displayName = clip.effectParamNames[squashed];
-        const value = clip.effectParams[squashed];
-        if (!displayName) continue;
-        
-        if (!propMap.has(displayName)) {
-          propMap.set(displayName, { squashed, values: new Set(), type: "unknown" });
-        }
-        
-        const entry = propMap.get(displayName);
-        if (value !== undefined && value !== null && value !== "") {
-          entry.values.add(String(value));
-        }
-        
-        // Detect type
-        const strVal = String(value).toLowerCase();
-        if (strVal === "true" || strVal === "false") {
-          entry.type = "boolean";
-        } else if (typeof value === "string" && value.includes(",")) {
-          entry.type = "text"; // arrays represented as comma-separated strings
-        } else if (typeof value === "number" || (!isNaN(parseFloat(value)) && value !== "")) {
-          if (entry.type !== "boolean") entry.type = "number";
-        } else if (typeof value === "string" && value !== "") {
-          if (entry.type === "unknown") entry.type = "text";
-        }
-      }
-    }
-  });
-
-  // 2. Build the modal HTML
-  const effectNames = Array.from(effectTree.keys()).sort((a, b) => {
-    // Put Motion and Opacity first, Audio second
-    const priority = ["Motion", "Opacity", "Volume", "Audio Clip Mixer"];
-    const aIdx = priority.indexOf(a);
-    const bIdx = priority.indexOf(b);
-    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-    if (aIdx !== -1) return -1;
-    if (bIdx !== -1) return 1;
-    return a.localeCompare(b);
-  });
-
-  const overlay = document.createElement("div");
-  overlay.className = "batch-modal-overlay";
-  overlay.innerHTML = `
-    <div class="batch-modal">
-      <div class="batch-modal-header">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
-        </svg>
-        <span class="batch-modal-title">Batch Edit Properties</span>
-        <span class="batch-modal-subtitle">${clips.length} clip${clips.length !== 1 ? "s" : ""}</span>
-        <button class="batch-modal-close" id="bm-close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 6L6 18M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-      <div class="batch-modal-body">
-        <div class="batch-effect-tree">
-          <div class="batch-tree-label">Effects Detected</div>
-          <div class="batch-effect-list" id="bm-effects">
-            ${effectNames.map((name, i) => {
-              const count = effectTree.get(name).size;
-              return `<div class="batch-effect-chip${i === 0 ? ' active' : ''}" data-effect="${escapeHtmlMain(name)}">
-                <span>✨</span> ${escapeHtmlMain(name)} <span class="chip-count">${count}</span>
-              </div>`;
-            }).join("")}
-          </div>
-        </div>
-        <div class="batch-prop-area" id="bm-props">
-          <!-- populated dynamically -->
-        </div>
-        <div class="batch-value-editor" id="bm-editor" style="display:none;">
-          <!-- populated when a property is selected -->
-        </div>
-      </div>
-      <div class="batch-modal-footer">
-        <span class="batch-footer-info" id="bm-info">Select a property to edit</span>
-        <button class="batch-cancel-btn" id="bm-cancel">Cancel</button>
-        <button class="batch-apply-btn" id="bm-apply" disabled>Apply Changes</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  // State
-  let selectedEffect = effectNames[0] || null;
-  let selectedProp = null; // { displayName, squashed, type, values }
-
-  function renderProps() {
-    const area = document.getElementById("bm-props");
-    if (!selectedEffect || !effectTree.has(selectedEffect)) {
-      area.innerHTML = `<div class="batch-prop-empty">No properties detected</div>`;
-      return;
-    }
-    const propMap = effectTree.get(selectedEffect);
-    const entries = Array.from(propMap.entries());
-    
-    if (entries.length === 0) {
-      area.innerHTML = `<div class="batch-prop-empty">No properties found for this effect</div>`;
-      return;
-    }
-
-    area.innerHTML = entries.map(([displayName, info]) => {
-      const valArr = Array.from(info.values);
-      const valPreview = valArr.length > 3 
-        ? valArr.slice(0, 3).join(", ") + "…" 
-        : valArr.join(", ");
-      const typeLabel = info.type === "boolean" ? "BOOL" : info.type === "number" ? "NUM" : "TEXT";
-      const isSelected = selectedProp && selectedProp.displayName === displayName;
-      
-      return `<div class="batch-prop-row${isSelected ? ' selected' : ''}" data-prop="${escapeHtmlMain(displayName)}">
-        <span class="batch-prop-name">${escapeHtmlMain(displayName)}</span>
-        <span class="batch-prop-val">${escapeHtmlMain(valPreview) || "—"}</span>
-        <span class="batch-prop-type">${typeLabel}</span>
-      </div>`;
-    }).join("");
-
-    // Attach click handlers
-    area.querySelectorAll(".batch-prop-row").forEach(row => {
-      row.addEventListener("click", () => {
-        const propName = row.dataset.prop;
-        const info = propMap.get(propName);
-        selectedProp = { displayName: propName, ...info };
-        
-        // Update selection UI
-        area.querySelectorAll(".batch-prop-row").forEach(r => r.classList.remove("selected"));
-        row.classList.add("selected");
-        
-        renderValueEditor();
-        document.getElementById("bm-apply").disabled = false;
-      });
-    });
-  }
-
-  function renderValueEditor() {
-    const editor = document.getElementById("bm-editor");
-    if (!selectedProp) {
-      editor.style.display = "none";
-      return;
-    }
-    editor.style.display = "";
-
-    const valArr = Array.from(selectedProp.values);
-    let valStr = "";
-    if (valArr.length === 1) valStr = valArr[0];
-    else if (valArr.length > 1) {
-      if (selectedProp.type === "text" && valArr.some(v => v.includes(","))) valStr = "Mixed";
-      else valStr = valArr.join(", ");
-    }
-    const mixedHint = valArr.length > 1 ? ` (mixed: ${valStr})` : "";
-
-    if (selectedProp.type === "boolean") {
-      const isTrueNow = valArr.some(v => v.toLowerCase() === "true" || v === "1");
-      const isFalseNow = valArr.some(v => v.toLowerCase() === "false" || v === "0");
-      editor.innerHTML = `
-        <div class="batch-value-row">
-          <span class="batch-value-label">${escapeHtmlMain(selectedProp.displayName)}</span>
-          <div class="batch-toggle-group" id="bm-toggle">
-            <button class="batch-toggle-btn${isTrueNow && !isFalseNow ? ' active' : ''}" data-val="true">✓ True / On</button>
-            <button class="batch-toggle-btn${isFalseNow && !isTrueNow ? ' active' : ''}" data-val="false">✗ False / Off</button>
-          </div>
-        </div>
-      `;
-      editor.querySelectorAll(".batch-toggle-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          editor.querySelectorAll(".batch-toggle-btn").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-        });
-      });
-    } else {
-      editor.innerHTML = `
-        <div class="batch-value-row">
-          <span class="batch-value-label">New Value</span>
-          <input class="batch-value-input" id="bm-val-input" type="${selectedProp.type === 'number' ? 'number' : 'text'}" 
-                 placeholder="${selectedProp.type === 'number' ? 'Enter number' : 'Enter value (e.g. 1920, 1080)'}${escapeHtmlMain(mixedHint)}" 
-                 value="${escapeHtmlMain(valStr === 'Mixed' ? '' : valStr)}" />
-        </div>
-      `;
-      // Auto-focus the input
-      setTimeout(() => {
-        const inp = document.getElementById("bm-val-input");
-        if (inp) { inp.focus(); inp.select(); }
-      }, 50);
-    }
-
-    document.getElementById("bm-info").innerHTML = `Editing <b>${escapeHtmlMain(selectedProp.displayName)}</b> on <b>${clips.length}</b> clips`;
-  }
-
-  // Render initial props
-  renderProps();
-
-  // Effect chip click handlers
-  document.getElementById("bm-effects").querySelectorAll(".batch-effect-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      document.getElementById("bm-effects").querySelectorAll(".batch-effect-chip").forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-      selectedEffect = chip.dataset.effect;
-      selectedProp = null;
-      document.getElementById("bm-editor").style.display = "none";
-      document.getElementById("bm-apply").disabled = true;
-      document.getElementById("bm-info").textContent = "Select a property to edit";
-      renderProps();
-    });
-  });
-
-  // Close handlers
-  function closeModal() {
-    overlay.classList.add("closing");
-    setTimeout(() => overlay.remove(), 200);
-  }
-  document.getElementById("bm-close").addEventListener("click", closeModal);
-  document.getElementById("bm-cancel").addEventListener("click", closeModal);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeModal();
-  });
-
-  // Apply handler
-  document.getElementById("bm-apply").addEventListener("click", async () => {
-    if (!selectedProp) return;
-    const applyBtn = document.getElementById("bm-apply");
-    applyBtn.disabled = true;
-    applyBtn.innerHTML = `<span class="spinner"></span>Applying…`;
-
-    // Get value
-    let finalVal, isString = true;
-    if (selectedProp.type === "boolean") {
-      const activeToggle = document.querySelector("#bm-toggle .batch-toggle-btn.active");
-      if (!activeToggle) { applyBtn.innerHTML = "Apply Changes"; applyBtn.disabled = false; return; }
-      finalVal = activeToggle.dataset.val === "true" ? 1 : 0;
-      isString = false;
-    } else {
-      const inp = document.getElementById("bm-val-input");
-      const rawVal = inp ? inp.value.trim() : "";
-      if (rawVal === "") { applyBtn.innerHTML = "Apply Changes"; applyBtn.disabled = false; return; }
-      
-      if (!isNaN(parseFloat(rawVal)) && isFinite(rawVal)) {
-        finalVal = parseFloat(rawVal);
-        isString = false;
-      } else if (rawVal.toLowerCase() === "true" || rawVal.toLowerCase() === "on") {
-        finalVal = 1;
-        isString = false;
-      } else if (rawVal.toLowerCase() === "false" || rawVal.toLowerCase() === "off") {
-        finalVal = 0;
-        isString = false;
-      } else {
-        finalVal = rawVal;
-      }
-    }
-
-    const idsToEdit = Array.from(selectedIds.size > 0 ? selectedIds : new Set(clips.map(c => c.id)));
-    
-    try {
-      const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), selectedProp.squashed, finalVal, isString);
-      if (res && res.success) {
-        applyBtn.innerHTML = "✓ Applied!";
-        applyBtn.style.background = "var(--green)";
-        
-        // Optimistic UI update: instantly update the local snapshot so the UI feels fast
-        idsToEdit.forEach(id => {
-          const c = lastSnapshot.find(cl => cl.id === id);
-          if (c && c.effectParams) {
-            // Check if it's an array property (like Position: [1920, 1080])
-            if (Array.isArray(c.effectParams[selectedProp.squashed]) && typeof finalVal === 'string') {
-                const parts = finalVal.split(',').map(n => parseFloat(n.trim()));
-                c.effectParams[selectedProp.squashed] = parts;
-            } else {
-                c.effectParams[selectedProp.squashed] = finalVal;
-            }
-          }
-        });
-        
-        // Re-filter clips so it picks up the optimistically updated values
-        clips = lastSnapshot.filter(c => idsToEdit.includes(c.id) || clips.some(m => m.id === c.id));
-        
-        // Rerender current effect's props with fresh values
-        renderProps();
-        
-        // Kick off a background poll to sync true state, but no need to await it
-        pollProject(true);
-        applyBtn.innerHTML = "Apply Changes";
-        applyBtn.disabled = false;
-        applyBtn.style.background = "";
-      } else {
-        applyBtn.innerHTML = "Apply Changes";
-        applyBtn.disabled = false;
-        applyBtn.style.background = "";
-        alert("Error: " + (res ? res.error : "Unknown error"));
-      }
-    } catch (err) {
-      applyBtn.innerHTML = "Apply Changes";
-      applyBtn.disabled = false;
-      alert("Error: " + err);
-    }
-  });
-}
-
 // Batch actions panel
 document.getElementById("batch-actions").addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
@@ -1891,86 +1408,87 @@ document.getElementById("batch-actions").addEventListener("click", async (e) => 
   if (!action) return;
   const currentMatches = lastSnapshot.filter(c => matchIds.has(c.id));
 
-  const originalHtml = btn.innerHTML;
-  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: batchSpin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Working...`;
-  btn.style.pointerEvents = "none";
-  
-  const minDelay = new Promise(r => setTimeout(r, 800));
+  if (action === "batch-edit") {
+    let defaultProp = "";
+    activeQueries.forEach(q => {
+      if (q.includes(":")) defaultProp = q.split(":")[0];
+    });
 
-  try {
-    if (action === "batch-edit") {
-      const clipsToEdit = selectedIds.size > 0 
-        ? lastSnapshot.filter(c => selectedIds.has(c.id))
-        : currentMatches;
-      openBatchEditModal(clipsToEdit);
-      return;
-    } else if (action === "select-all") {
-      selectedIds = new Set(currentMatches.map(c => c.id));
-      await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
-    } else if (action === "reveal-first") {
-      if (selectedIds.size > 0) {
-        // Only select the first one to make it fast
-        const arr = Array.from(selectedIds).slice(0, 1);
-        if (arr[0].startsWith("proj_")) {
-          const nodeIds = arr.map(id => id.replace("proj_", ""));
-          await evalHost("ffs_selectProjectItems", JSON.stringify(nodeIds));
-        } else {
-          await evalHost("ffs_selectClips", JSON.stringify(arr));
-        }
-      } else if (currentMatches[0]) {
-        selectedIds = new Set([currentMatches[0].id]);
-        if (currentMatches[0].id.startsWith("proj_")) {
-          await evalHost("ffs_selectProjectItems", JSON.stringify([currentMatches[0].nodeId]));
-        } else {
-          await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
-        }
-      }
-    } else if (action === "select-sequence") {
-      const inSeq = currentMatches.filter(c => c.sequenceName === activeSequenceName);
-      selectedIds = new Set(inSeq.map(c => c.id));
-      await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
-    } else if (action === "select-project") {
-      selectedIds = new Set(currentMatches.map(c => c.id));
-      await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
-    } else if (action === "export") {
-      exportCSV(currentMatches);
+    const propRaw = prompt("Enter the property name you want to batch edit (e.g. 'Uniform Scale' or 'Opacity'):", defaultProp);
+    if (!propRaw) return;
+
+    const valRaw = prompt(`Enter the new value for "${propRaw}":`);
+    if (valRaw === null) return;
+
+    const squashed = propRaw.toLowerCase().replace(/\s+/g, "");
+    
+    // Convert boolean-like strings
+    let isString = true;
+    let finalVal = valRaw.trim();
+    if (finalVal.toLowerCase() === "true" || finalVal.toLowerCase() === "on") {
+      finalVal = 1;
+      isString = false;
+    } else if (finalVal.toLowerCase() === "false" || finalVal.toLowerCase() === "off") {
+      finalVal = 0;
+      isString = false;
+    } else if (!isNaN(parseFloat(finalVal))) {
+      finalVal = parseFloat(finalVal);
+      isString = false;
     }
-    await minDelay;
-  } finally {
-    btn.innerHTML = originalHtml;
-    btn.style.pointerEvents = "auto";
+
+    const idsToEdit = Array.from(selectedIds.size > 0 ? selectedIds : new Set(currentMatches.map(c => c.id)));
+    if (idsToEdit.length === 0) return;
+
+    const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), squashed, finalVal, isString);
+    if (res && res.success) {
+      // Force an immediate refresh
+      pollProject();
+    } else {
+      alert("Error batch editing properties: " + (res ? res.error : "Unknown error"));
+    }
+    return;
+  } else if (action === "select-all") {
+    selectedIds = new Set(currentMatches.map(c => c.id));
+    await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+  } else if (action === "reveal-first") {
+    if (selectedIds.size > 0) {
+      const arr = Array.from(selectedIds);
+      if (arr[0].startsWith("proj_")) {
+        const nodeIds = arr.map(id => id.replace("proj_", ""));
+        await evalHost("ffs_selectProjectItems", JSON.stringify(nodeIds));
+      } else {
+        await evalHost("ffs_selectClips", JSON.stringify(arr));
+      }
+    } else if (currentMatches[0]) {
+      selectedIds = new Set([currentMatches[0].id]);
+      if (currentMatches[0].id.startsWith("proj_")) {
+        await evalHost("ffs_selectProjectItems", JSON.stringify([currentMatches[0].nodeId]));
+      } else {
+        await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+      }
+    }
+  } else if (action === "select-sequence") {
+    const inSeq = currentMatches.filter(c => c.sequenceName === activeSequenceName);
+    selectedIds = new Set(inSeq.map(c => c.id));
+    await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+  } else if (action === "select-project") {
+    selectedIds = new Set(currentMatches.map(c => c.id));
+    await evalHost("ffs_selectClips", JSON.stringify(Array.from(selectedIds)));
+  } else if (action === "export") {
+    exportCSV(currentMatches);
   }
 
   runSearch(lastQuery, { rerenderOnly: true });
   window.ffsRerenderTimeline();
 });
 
-// Add refresh button handler
-const refreshBtn = document.getElementById("refresh-btn");
-if (refreshBtn) {
-  refreshBtn.addEventListener("click", () => {
-    const svg = refreshBtn.querySelector("svg");
-    if (svg) svg.style.animation = "batchSpin 1s linear infinite";
-    
-    pollProject(true).finally(() => {
-      if (svg) svg.style.animation = "";
-    });
-  });
-}
-
 // Initial render of saved searches badge
 renderSavedSearches();
 renderActiveChips();
 
-// Initial rendering with cached data, then start polling
-if (lastSnapshot.length > 0 || lastProjectAssets.length > 0) {
-  runSearch(document.getElementById("query").value);
-  window.ffsRerenderTimeline();
-  updateAnalytics();
-  updatePerformanceScanner();
-}
-pollProject(true);
-setInterval(() => pollProject(), POLL_MS);
+// Start polling
+pollProject();
+setInterval(pollProject, POLL_MS);
 
 // Inspector Tab Switching
 document.querySelectorAll(".insp-tab").forEach(tab => {
@@ -2017,65 +1535,3 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-
-// --- Panel Resizer Logic ---
-const sidebarResizer = document.getElementById('sidebar-resizer');
-const inspectorResizer = document.getElementById('inspector-resizer');
-const sidebar = document.querySelector('.sidebar');
-const inspector = document.querySelector('.inspector');
-
-if (sidebarResizer && sidebar) {
-  let isResizingSidebar = false;
-  let startX = 0;
-  let startWidth = 0;
-
-  sidebarResizer.addEventListener('mousedown', (e) => {
-    isResizingSidebar = true;
-    startX = e.clientX;
-    startWidth = sidebar.getBoundingClientRect().width;
-    document.body.style.cursor = 'ew-resize';
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isResizingSidebar) return;
-    const dx = e.clientX - startX;
-    const newWidth = Math.max(150, Math.min(startWidth + dx, 500));
-    sidebar.style.width = newWidth + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (isResizingSidebar) {
-      isResizingSidebar = false;
-      document.body.style.cursor = '';
-    }
-  });
-}
-
-if (inspectorResizer && inspector) {
-  let isResizingInspector = false;
-  let startX = 0;
-  let startWidth = 0;
-
-  inspectorResizer.addEventListener('mousedown', (e) => {
-    isResizingInspector = true;
-    startX = e.clientX;
-    startWidth = inspector.getBoundingClientRect().width;
-    document.body.style.cursor = 'ew-resize';
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isResizingInspector) return;
-    const dx = startX - e.clientX; // Inverted because it's on the right
-    const newWidth = Math.max(150, Math.min(startWidth + dx, 600));
-    inspector.style.width = newWidth + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (isResizingInspector) {
-      isResizingInspector = false;
-      document.body.style.cursor = '';
-    }
-  });
-}

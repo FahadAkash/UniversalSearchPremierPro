@@ -1,0 +1,25 @@
+{
+  "id": "com.fahad.reveal-in-timeline",
+  "name": "Reveal In Timeline",
+  "version": "1.0.0",
+  "main": "index.html",
+  "manifestVersion": 5,
+  "host": {
+    "app": "PPRO",
+    "minVersion": "25.0"
+  },
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "revealPanel",
+      "label": { "default": "Reveal In Timeline" },
+      "minimumSize": { "width": 240, "height": 140 },
+      "maximumSize": { "width": 600, "height": 600 },
+      "preferredDockedSize": { "width": 280, "height": 180 },
+      "preferredFloatingSize": { "width": 320, "height": 200 }
+    }
+  ],
+  "requiredPermissions": {
+    "network": { "domains": "none" }
+  }
+}

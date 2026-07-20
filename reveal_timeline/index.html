@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body {
+      margin: 0;
+      padding: 14px;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      background: #1e1e1e;
+      color: #ddd;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      background: #4a9eff;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:active { background: #3a82d6; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 12px;
+      min-height: 32px;
+      line-height: 1.4;
+      color: #8fd3ff;
+    }
+  </style>
+</head>
+<body>
+  <button id="revealBtn">⏵ Reveal Selected Clip in Timeline</button>
+
+  <div class="row">
+    <input type="checkbox" id="autoToggle" />
+    <label for="autoToggle">Auto-reveal when Project panel selection changes</label>
+  </div>
+
+  <div id="status">Select a clip in the Project panel, then click the button.</div>
+
+  <script src="./index.js"></script>
+</body>
+</html>

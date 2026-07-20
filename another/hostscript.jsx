@@ -109,7 +109,6 @@ function ffs_getProjectSnapshot() {
                     var effects = [];
                     var effectParams = {};
                     var effectParamNames = {};
-                    var effectParamGroups = {};
                     var keyframeCount = 0;
 
                     try {
@@ -139,64 +138,46 @@ function ffs_getProjectSnapshot() {
                             for (var p = 0; p < comp.properties.numItems; p++) {
                                 try {
                                     var prop = comp.properties[p];
-                                    var dispName = prop.displayName || prop.name || String(p);
-                                    if (!dispName) continue;
+                                    if (!prop.displayName) continue;
 
-                                    var rawKey = dispName.toLowerCase().replace(/\s+/g, "");
+                                    var val = prop.getValue();
+
+                                    if (isMotionComp) {
+                                        if (prop.displayName === "Scale") scale = val;
+                                        else if (prop.displayName === "Rotation") rotation = val;
+                                        else if (prop.displayName === "Position" && val && val.length >= 2) {
+                                            position = Math.round(val[0]) + ", " + Math.round(val[1]);
+                                        }
+                                    } else if (isOpacityComp && prop.displayName === "Opacity") {
+                                        opacity = val;
+                                    } else if (isVolumeComp && (prop.displayName === "Level" || prop.displayName === "Volume")) {
+                                        volume = val;
+                                    }
+
+                                    var rawKey = prop.displayName.toLowerCase().replace(/\s+/g, "");
                                     var key = rawKey;
-                                    var finalDisplayName = dispName;
+                                    var finalDisplayName = prop.displayName;
 
-                                    if (effectParamNames.hasOwnProperty(key)) {
+                                    // If this key already exists for this clip, disambiguate using internal name
+                                    if (effectParams.hasOwnProperty(key)) {
                                         var internalName = prop.name || String(p);
+                                        // Clean up internal name for UI if possible (e.g. ADBE Levels-0002 -> Levels-0002)
                                         internalName = internalName.replace(/^ADBE\s*/, "");
-                                        finalDisplayName = dispName + " (" + internalName + ")";
+                                        finalDisplayName = prop.displayName + " (" + internalName + ")";
                                         key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
                                     }
 
-                                    effectParamNames[key] = finalDisplayName;
-                                    if (!effectParamGroups[comp.displayName]) {
-                                        effectParamGroups[comp.displayName] = [];
-                                    }
-                                    effectParamGroups[comp.displayName].push(key);
-
-                                    var val = undefined;
-                                    try {
-                                        val = prop.getValue();
-                                    } catch(e) { }
-
+                                    // Stringify arrays (like position) or objects so they can be JSON serialized without huge nesting
                                     if (val !== undefined && val !== null) {
-                                        if (isMotionComp) {
-                                            if (prop.displayName === "Scale") scale = val;
-                                            else if (prop.displayName === "Rotation") rotation = val;
-                                            else if (prop.displayName === "Position" && val.length >= 2) {
-                                                position = Math.round(val[0]) + ", " + Math.round(val[1]);
-                                            }
-                                        } else if (isOpacityComp && prop.displayName === "Opacity") {
-                                            opacity = val;
-                                        } else if (isVolumeComp && (prop.displayName === "Level" || prop.displayName === "Volume")) {
-                                            volume = val;
-                                        }
-
-                                        if (typeof val === 'object') {
-                                            if (val.length !== undefined) {
-                                                var arr = [];
-                                                for(var x=0; x<val.length; x++) arr.push(Math.round(val[x]*100)/100);
-                                                effectParams[key] = arr.join(", ");
-                                            } else {
-                                                // Safely convert complex objects (like Time, Color) to string or primitive
-                                                try {
-                                                    if (typeof val.seconds === 'number') {
-                                                        effectParams[key] = val.seconds;
-                                                    } else {
-                                                        effectParams[key] = val.toString();
-                                                    }
-                                                } catch(err) {
-                                                    effectParams[key] = "[Object]";
-                                                }
-                                            }
+                                        if (typeof val === 'object' && val.length !== undefined) {
+                                            // It's an array
+                                            var arr = [];
+                                            for(var x=0; x<val.length; x++) arr.push(Math.round(val[x]*100)/100);
+                                            effectParams[key] = arr.join(", ");
                                         } else {
                                             effectParams[key] = val;
                                         }
+                                        effectParamNames[key] = finalDisplayName;
                                     }
 
                                     if (prop.isTimeVarying && prop.isTimeVarying()) {
@@ -306,7 +287,6 @@ function ffs_getProjectSnapshot() {
                         effects: effects,
                         effectParams: effectParams,
                         effectParamNames: effectParamNames,
-                        effectParamGroups: effectParamGroups,
                         nested: isNested,
                         adjustment: isAdjustment,
                         isGraphic: isGraphic,
@@ -449,12 +429,16 @@ function ffs_selectClips(idsJson) {
             toSelect.push(clip);
         }
 
-        for (var j = 0; j < toSelect.length; j++) {
-            toSelect[j].setSelected(1, j === 0 ? 1 : 0);
+        if (typeof seq.setSelection === "function") {
+            seq.setSelection(toSelect);
+        } else {
+            for (var j = 0; j < toSelect.length; j++) {
+                toSelect[j].setSelected(true, j === 0);
+            }
         }
 
         if (toSelect.length > 0) {
-            seq.setPlayerPosition(toSelect[0].start);
+            seq.setPlayerPosition(toSelect[0].start.ticks);
         }
         return JSON.stringify(true);
     } catch (e) {
@@ -613,20 +597,11 @@ function ffs_getLayerOverview() {
 function ffs_getActiveState() {
     try {
         var seq = app.project.activeSequence;
-        var selectedNodeId = null;
-        try {
-            var selection = app.project.getSelection();
-            if (selection && selection.length > 0) {
-                selectedNodeId = selection[0].nodeId;
-            }
-        } catch(e) {}
-
+        if (!seq) return JSON.stringify({ connected: true, sequence: null });
         return JSON.stringify({
             connected: true,
-            sequence: seq ? seq.name : null,
-            playhead: seq ? seq.getPlayerPosition().seconds : 0,
-            projectName: app.project.name,
-            selectedNodeId: selectedNodeId
+            sequence: seq.name,
+            playhead: seq.getPlayerPosition().seconds
         });
     } catch (e) {
         return JSON.stringify({ connected: false });
@@ -757,51 +732,6 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
         }
         return JSON.stringify({ success: true, count: count });
     } catch(e) {
-        return JSON.stringify({ success: false, error: e.toString() });
-    }
-}
-
-function ffs_revealProjectItemInTimeline(nodeId) {
-    try {
-        var seq = app.project.activeSequence;
-        if (!seq) return JSON.stringify({ success: false, error: "No active sequence" });
-        
-        var targetItem = _findProjectItemByNodeId(app.project.rootItem, nodeId);
-        if (!targetItem) return JSON.stringify({ success: false, error: "Project item not found" });
-        
-        var toSelect = [];
-        
-        function scanTracks(tracks) {
-            for (var t = 0; t < tracks.numTracks; t++) {
-                var track = tracks[t];
-                for (var c = 0; c < track.clips.numItems; c++) {
-                    var clip = track.clips[c];
-                    if (clip.projectItem && clip.projectItem.nodeId === targetItem.nodeId) {
-                        toSelect.push(clip);
-                    }
-                }
-            }
-        }
-        
-        scanTracks(seq.videoTracks);
-        scanTracks(seq.audioTracks);
-        
-        if (toSelect.length === 0) {
-            return JSON.stringify({ success: false, error: "Item not used in active sequence" });
-        }
-        
-        toSelect.sort(function(a, b) {
-            return a.start.ticks - b.start.ticks;
-        });
-        
-        for (var j = 0; j < toSelect.length; j++) {
-            toSelect[j].setSelected(1, j === 0 ? 1 : 0);
-        }
-        
-        seq.setPlayerPosition(toSelect[0].start);
-        
-        return JSON.stringify({ success: true, count: toSelect.length });
-    } catch (e) {
         return JSON.stringify({ success: false, error: e.toString() });
     }
 }
