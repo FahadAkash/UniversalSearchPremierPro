@@ -41,7 +41,9 @@ Prefixing a supported key or term with `-` or `!` negates the match (e.g. `-effe
 ### Text Search
 If a word has no operator, it defaults to a plain text search matching the clip's name (e.g. `B-Roll` searches for clips with "B-Roll" in their name).
 
-### 1. Clip Attributes & Types
+---
+
+### 1. Complete List of Search Keys
 
 | Key | Description | Example |
 | :--- | :--- | :--- |
@@ -55,6 +57,10 @@ If a word has no operator, it defaults to a plain text search matching the clip'
 | `label` | Matches the clip's Color Label name | `label:Lavender`, `label:Blue` |
 | `resolution` | Filters clips by resolution | `resolution:3840x2160` |
 | `codec` | Filters clips by codec | `codec:ProRes` |
+| `volume` | Audio clip volume in dB | `volume < 0`, `volume:5` |
+| `opacity` | Clip opacity percentage (0-100) | `opacity < 100`, `opacity:50` |
+| `scale` | Clip scale percentage | `scale > 100`, `scale:120` |
+| `rotation` | Clip rotation angle in degrees | `rotation != 0` |
 
 ### 2. Built-in Boolean Flags
 
@@ -83,7 +89,7 @@ Use `true` or `false` with these keys:
 | `hasfps` | Matches clips with frame rate metadata | `hasfps:true` |
 | `hascodec` | Matches clips with codec metadata | `hascodec:true` |
 
-### 3. Asset States (`asset:<value>`)
+### 3. Project Asset Filters (`asset:<value>`)
 
 Filters project assets matching specific file statuses:
 
@@ -97,29 +103,75 @@ Filters project assets matching specific file statuses:
 | `asset:duplicate` | Identifies duplicate assets used across the project (matched by file path) | `asset:duplicate` |
 | `asset:missingfont` | Placeholder (currently returns no matches) | `asset:missingfont` |
 
-### 4. Transform & Volume Ranges
+---
 
-Filter clips by exact values or ranges:
+## ⚡ Smart Resolver (Dynamic Effect Parameters)
 
-| Key | Description | Example |
+Universal Search dynamically parses applied effect parameters that are not hardcoded. When a user searches for an effect parameter, it matches it to the selected effect chip.
+
+### Common Premiere Pro Effects & Parameter Query Examples
+
+| Effect Name | Example Parameters | Example Query |
 | :--- | :--- | :--- |
-| `volume` | Audio clip volume in dB | `volume < 0`, `volume:5` |
-| `opacity` | Clip opacity percentage (0-100) | `opacity < 100`, `opacity:50` |
-| `scale` | Clip scale percentage | `scale > 100`, `scale:120` |
-| `rotation` | Clip rotation angle in degrees | `rotation != 0` |
+| **Lumetri Color** | `exposure`, `contrast`, `highlights`, `shadows`, `whites`, `blacks`, `saturation`, `temperature`, `tint` | `effect:"Lumetri Color" exposure > 1.5` |
+| **Gaussian Blur** | `blurriness`, `blurdimensions`, `repeatedgepixels` | `effect:"Gaussian Blur" blurriness > 25` |
+| **Crop** | `left`, `top`, `right`, `bottom`, `zoom` | `effect:"Crop" left > 10` |
+| **Transform** | `scale`, `skew`, `rotation`, `opacity`, `position` | `effect:"Transform" skew != 0` |
+| **Ultra Key** | `setting`, `color`, `translucency`, `pedestal`, `chokemidtone` | `effect:"Ultra Key" pedestal > 10` |
+| **ProcAmp** | `brightness`, `contrast`, `hue`, `saturation` | `effect:"ProcAmp" brightness > 10` |
 
-### 5. Smart Resolver (Dynamic Effect Parameters)
+*Note: Suffixes `bypass` (or `bypass<effectname>`) can be queried with boolean flags (e.g. `bypass:true` or `bypass:false`).*
 
-Universal Search dynamically parses applied effect parameters that are not hardcoded. 
+---
 
-For instance, if a clip has a **Gaussian Blur** effect applied, and you search:
-`effect:"Gaussian Blur" blurriness > 15`
+## 🤖 AI Natural Language Translation Mappings
 
-The Smart Resolver will identify the parameter `blurriness` (internally stored as `blurrinessgaussianblur`), extract it, and filter clips where that parameter is greater than `15`.
+When the **AI Toggle** is active, plain English terms are dynamically translated into structured query filters before being executed:
 
-Common dynamic parameter suffixes:
-* **`bypass`** (or `bypass<effectname>`) — e.g. `bypass:true` or `bypass:false`
-* **`uniformscale`** (synonym: `scalewidth`) — e.g. `uniformscale:true`
+| Input Phrase | Translated Query |
+| :--- | :--- |
+| `gaussian blur` or `blur` | `effect:"Gaussian Blur"` |
+| `warp stab` | `effect:"Warp Stabilizer"` |
+| `lumetri` or `color correct` | `effect:"Lumetri Color"` |
+| `sharpen` | `effect:"Sharpen"` |
+| `ultra key` or `chroma key` or `green screen` | `effect:"Ultra Key"` |
+| `cross dissolve` | `effect:"Cross Dissolve"` |
+| `dip to black` | `effect:"Dip to Black"` |
+| `loud audio` or `loud clip` or `loud` | `volume>6` |
+| `quiet` or `silent` or `low volume` | `volume<-6` |
+| `4k` or `uhd` | `resolution:4K` |
+| `1080` or `full hd` | `resolution:1080` |
+| `offline` or `missing` | `offline:true` |
+| `nested` or `nest` | `nested:true` |
+| `proxy` or `proxies` | `proxy:true` |
+| `no proxy` | `proxy:false` |
+| `scaled` or `zoomed` or `zoom` | `scale>100` |
+| `transparent` or `faded` | `opacity<100` |
+| `rotated` | `rotation!=0` |
+| `longer than [X]s` / `[X]m` | `duration>[X]` (converts minutes to seconds) |
+| `shorter than [X]s` / `[X]m` | `duration<[X]` (converts minutes to seconds) |
+| `find/show/where/which/clips with [X]` | `effect:"[X]"` |
+
+---
+
+## ⌨️ Command Palette Commands & Shortcuts
+
+Press **`Ctrl+P`** (Windows) or **`⌘P`** (Mac) to open the Command Palette. Type a command to search and execute:
+
+| Command | Action | Keyboard Shortcut |
+| :--- | :--- | :--- |
+| **Select All Matches** | Selects all matched clips in active sequence | `Enter` (inside palette) |
+| **Reveal First Match in Timeline** | Focuses/reveals the first match in sequence | `Alt+R` |
+| **Export Search Results CSV** | Exports search result columns to CSV file | `Shift+E` |
+| **Toggle AI Natural Language Search** | Toggles natural language query translation | `Alt+A` |
+| **Save Current Search** | Saves query pattern to saved queries list | `Ctrl+S` |
+| **Run Performance Scanner** | Switches view to Performance Scanner dashboard | `Alt+S` |
+| **Show Project Analytics** | Switches view to Project Analytics dashboard | `Alt+D` |
+| **Reset All Search Fields** | Clears the active search query | `Esc` |
+| **Batch: Set Volume on Matches** | Prompts to change volume dB of matches | `Alt+V` |
+| **Batch: Set Scale on Matches** | Prompts to change scale % of matches | `Alt+Z` |
+| **Batch: Set Opacity on Matches** | Prompts to change opacity % of matches | `Alt+O` |
+| **Batch: Rename Matches** | Prompts to batch rename matched clips | `Alt+N` |
 
 ---
 
