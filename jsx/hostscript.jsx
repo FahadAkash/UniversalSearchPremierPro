@@ -113,9 +113,26 @@ function ffs_getProjectSnapshot() {
                     var keyframeCount = 0;
 
                     try {
+                        var componentCounts = {};
+                        for (var kc = 0; kc < clip.components.numItems; kc++) {
+                            var cComp = clip.components[kc];
+                            if (cComp.displayName) {
+                                componentCounts[cComp.displayName] = (componentCounts[cComp.displayName] || 0) + 1;
+                            }
+                        }
+
+                        var componentSeen = {};
                         for (var k = 0; k < clip.components.numItems; k++) {
                             var comp = clip.components[k];
-                            effects.push(comp.displayName);
+                            var compName = comp.displayName;
+                            var suffix = "";
+                            if (componentCounts[compName] > 1) {
+                                componentSeen[compName] = (componentSeen[compName] || 0) + 1;
+                                suffix = " (" + componentSeen[compName] + ")";
+                                compName = compName + suffix;
+                            }
+
+                            effects.push(compName);
                             if (comp.displayName.indexOf("Lumetri Color") !== -1) hasLumetri = true;
 
                             if (comp.displayName === "Graphic Parameters" || comp.displayName.indexOf("Essential Graphics") !== -1) {
@@ -146,18 +163,23 @@ function ffs_getProjectSnapshot() {
                                     var key = rawKey;
                                     var finalDisplayName = dispName;
 
+                                    if (suffix !== "") {
+                                        finalDisplayName = dispName + suffix;
+                                        key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
+                                    }
+
                                     if (effectParamNames.hasOwnProperty(key)) {
                                         var internalName = prop.name || String(p);
                                         internalName = internalName.replace(/^ADBE\s*/, "");
-                                        finalDisplayName = dispName + " (" + internalName + ")";
+                                        finalDisplayName = dispName + " (" + internalName + ")" + suffix;
                                         key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
                                     }
 
                                     effectParamNames[key] = finalDisplayName;
-                                    if (!effectParamGroups[comp.displayName]) {
-                                        effectParamGroups[comp.displayName] = [];
+                                    if (!effectParamGroups[compName]) {
+                                        effectParamGroups[compName] = [];
                                     }
-                                    effectParamGroups[comp.displayName].push(key);
+                                    effectParamGroups[compName].push(key);
 
                                     var val = undefined;
                                     try {
@@ -701,7 +723,7 @@ function ffs_batchAction(idsJson, actionType, value) {
 }
 
 // Batch edit an arbitrary effect property across multiple clips
-function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isString) {
+function batchSetEffectProperty(clipIdsJson, targetEffectName, squashedPropertyName, newValue, isString) {
     var count = 0;
     try {
         var clipIds = JSON.parse(clipIdsJson);
@@ -728,8 +750,27 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
             if (p.c >= track.clips.numItems) continue;
             var clip = track.clips[p.c];
 
+            var componentCounts = {};
+            for (var kc = 0; kc < clip.components.numItems; kc++) {
+                var cComp = clip.components[kc];
+                if (cComp.displayName) {
+                    componentCounts[cComp.displayName] = (componentCounts[cComp.displayName] || 0) + 1;
+                }
+            }
+
+            var componentSeen = {};
             for (var k = 0; k < clip.components.numItems; k++) {
                 var comp = clip.components[k];
+                var compName = comp.displayName;
+                var suffix = "";
+                if (componentCounts[compName] > 1) {
+                    componentSeen[compName] = (componentSeen[compName] || 0) + 1;
+                    suffix = " (" + componentSeen[compName] + ")";
+                    compName = compName + suffix;
+                }
+
+                if (compName !== targetEffectName) continue;
+
                 var localNames = {}; // Track names to match exact disambiguation logic
                 
                 for (var pr = 0; pr < comp.properties.numItems; pr++) {
@@ -738,10 +779,15 @@ function batchSetEffectProperty(clipIdsJson, squashedPropertyName, newValue, isS
                         var rawKey = prop.displayName.toLowerCase().replace(/\s+/g, "");
                         var key = rawKey;
                         
+                        if (suffix !== "") {
+                            var finalDisplayName = prop.displayName + suffix;
+                            key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
+                        }
+
                         if (localNames.hasOwnProperty(key)) {
                             var internalName = prop.name || String(pr);
                             internalName = internalName.replace(/^ADBE\s*/, "");
-                            var finalDisplayName = prop.displayName + " (" + internalName + ")";
+                            var finalDisplayName = prop.displayName + " (" + internalName + ")" + suffix;
                             key = finalDisplayName.toLowerCase().replace(/\s+/g, "");
                         } else {
                             localNames[key] = true;

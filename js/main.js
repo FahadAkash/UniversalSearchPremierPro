@@ -1839,7 +1839,7 @@ function openBatchEditModal(clips) {
     const idsToEdit = Array.from(selectedIds.size > 0 ? selectedIds : new Set(clips.map(c => c.id)));
     
     try {
-      const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), selectedProp.squashed, finalVal, isString);
+      const res = await evalHost("batchSetEffectProperty", JSON.stringify(idsToEdit), selectedEffect, selectedProp.squashed, finalVal, isString);
       if (res && res.success) {
         applyBtn.innerHTML = "✓ Applied!";
         applyBtn.style.background = "var(--green)";
